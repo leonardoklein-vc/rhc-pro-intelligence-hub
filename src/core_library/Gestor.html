@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4F4F4F; /* Cinza escuro corporativo */
+      --secondary: #E0E0E0; /* Cinza claro fundo de abas */
+      --accent: #5C6BC0; /* Azul hospitalar/botões */
+      --bg: #F5F5F5;
+      --card: #FFFFFF;
+      --text: #333333;
+      --muted: #757575;
+      --border: #BDBDBD;
+      --sisrhc-bar: #D6D6D6; /* Cor da barra do print */
+    }
+    body { font-family: 'Roboto', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+    
+    /* Layout Base */
+    .sidebar { width: 320px; min-width: 320px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+    .main-content { flex: 1; display: flex; flex-direction: column; position: relative; background: var(--card); min-width: 0; }
+    
+    /* Header da Sidebar */
+    .sidebar-header { padding: 15px; background: var(--primary); color: white; }
+    .search-box { width: 100%; box-sizing: border-box; padding: 10px; border: none; border-radius: 4px; outline: none; margin-top: 10px; font-family: 'Roboto'; font-size: 13px; }
+    
+    /* Lista de Pacientes */
+    .patient-list { flex: 1; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+    .patient-item { padding: 12px 15px; border-bottom: 1px solid #E0E0E0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s; }
+    .patient-item:hover { background: #F5F5F5; }
+    .patient-item.active { background: #E8EAF6; border-left: 4px solid var(--accent); }
+    .p-name { font-weight: 700; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px;}
+    .p-pront { font-size: 11px; color: var(--muted); margin-top: 2px;}
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .status-ok { background-color: #4CAF50; }
+    .status-pend { background-color: #F44336; }
+
+    /* Área Principal */
+    .top-bar { padding: 15px 25px; background: white; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+    .form-container { flex: 1; overflow-y: auto; padding: 25px; min-width: 0; background: white;}
+    
+    /* Estilo das Abas (Estilo SISRHC) */
+    .form-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--secondary); padding: 10px 25px 0 25px; gap: 5px;}
+    .f-tab { padding: 10px 20px; cursor: pointer; font-weight: 500; font-size: 13px; color: var(--text); background: #EEEEEE; border: 1px solid var(--border); border-bottom: none; border-radius: 4px 4px 0 0; }
+    .f-tab.active { background: white; color: var(--text); font-weight: 700; border-bottom: 1px solid white; margin-bottom: -1px; }
+    
+    /* Estilo dos Blocos (Estilo SISRHC) */
+    .fieldset { display: none; padding-bottom: 50px; }
+    .fieldset.active { display: block; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    
+    .sisrhc-header { background-color: var(--sisrhc-bar); padding: 8px 15px; font-size: 14px; font-weight: 700; color: #424242; margin: 25px 0 20px 0; border-radius: 2px; text-transform: uppercase; }
+    .sisrhc-header:first-child { margin-top: 0; }
+    
+    /* Grids e Campos */
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+    
+    .input-group { display: flex; flex-direction: column; min-width: 0; }
+    label { font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    /* Campos clean tipo formulário de papel */
+    input, select, textarea { width: 100%; box-sizing: border-box; padding: 8px 5px; border: none; border-bottom: 1px solid #9E9E9E; background: transparent; font-family: 'Roboto'; font-size: 13px; color: #212121; outline: none; transition: border-color 0.2s; }
+    input:focus, select:focus { border-bottom: 2px solid var(--accent); padding-bottom: 7px; }
+    
+    .read-only input, .read-only textarea { color: #757575; border-bottom: 1px dotted #BDBDBD; cursor: default; }
+    
+    .save-btn { background: var(--accent); color: white; border: none; padding: 10px 24px; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; transition: background 0.2s; text-transform: uppercase; }
+    .save-btn:hover { background: #3F51B5; }
+    
+    #loader-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; color: var(--accent); font-weight: 500; }
+    .spinner { font-size: 35px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR: LISTA -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div style="font-weight: 700; font-size: 15px;"><i class="fa-solid fa-hospital-user"></i> Banco de Pacientes</div>
+      <input type="text" id="search-box" class="search-box" placeholder="Filtrar nome ou prontuário..." onkeyup="filtrarLista()">
+    </div>
+    <ul class="patient-list" id="lista-pacientes"></ul>
+  </div>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <div class="main-content">
+    
+    <div id="loader-overlay">
+      <i class="fa-solid fa-circle-notch spinner"></i> 
+      <span id="loader-text">Inicializando Registro RHC...</span>
+    </div>
+
+    <!-- CABEÇALHO DO PACIENTE -->
+    <div class="top-bar">
+      <div style="min-width:0; margin-right: 15px;">
+        <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 3px;">Paciente Selecionado</div>
+        <h2 style="margin:0; font-size: 20px; color: #212121; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-nome-paciente">---</h2>
+        <span style="font-size: 13px; color: var(--muted); font-weight: 500;" id="lbl-prontuario">Prontuário: ---</span>
+      </div>
+      <button class="save-btn" onclick="salvarPaciente()" id="btn-salvar" disabled>
+        <i class="fa-solid fa-print"></i> Gravar Ficha
+      </button>
+    </div>
+
+    <!-- ABAS (Registro Passo 4 ativa por padrão) -->
+    <div class="form-tabs">
+      <div class="f-tab" onclick="switchFormTab('tab-demograficos', this)">Paciente (Querie)</div>
+      <div class="f-tab" onclick="switchFormTab('tab-clinica', this)">Indicador (Passo 2)</div>
+      <div class="f-tab active" onclick="switchFormTab('tab-fase4', this)">Registro (Passo 4)</div>
+    </div>
+
+    <form class="form-container" id="form-paciente">
+      <input type="hidden" id="linha-atual">
+
+      <!-- ================= ABA 1: PACIENTE (QUERIE) ================= -->
+      <div id="tab-demograficos" class="fieldset read-only">
+        <div class="sisrhc-header">Identificação do Paciente</div>
+        <div class="grid-4">
+          <div class="input-group"><label>Prontuário</label><input type="text" name="PRONTUARIO" readonly></div>
+          <div class="input-group"><label>Cód. Paciente</label><input type="text" name="PAC_CODIGO" readonly></div>
+          <div class="input-group"><label>CPF</label><input type="text" name="CPF" readonly></div>
+          <div class="input-group"><label>CNS</label><input type="text" name="CNS" readonly></div>
+        </div>
+        
+        <div class="grid-2" style="margin-top: 20px;">
+          <div class="input-group"><label>Nome Completo do Paciente</label><input type="text" name="Nome do paciente" readonly style="font-weight: bold; color: #212121;"></div>
+          <div class="input-group"><label>Nome da Mãe</label><input type="text" name="NOME_MAE" readonly></div>
+        </div>
+
+        <div class="grid-4" style="margin-top: 20px;">
+          <div class="input-group"><label>Data de Nascimento</label><input type="text" name="DT_NASCIMENTO" readonly></div>
+          <div class="input-group"><label>Idade</label><input type="text" name="IDADE" readonly></div>
+          <div class="input-group"><label>Sexo</label><input type="text" name="SEXO" readonly></div>
+          <div class="input-group"><label>Raça/Cor (Etnia)</label><input type="text" name="ETNIA" readonly></div>
+        </div>
+
+        <div class="sisrhc-header">Itens de Localização do Paciente</div>
+        <div class="grid-4">
+          <div class="input-group"><label>CEP</label><input type="text" name="CEP" readonly></div>
+          <div class="input-group" style="grid-column: span 3;"><label>Endereço / Logradouro</label><input type="text" name="ENDERECO" readonly></div>
+        </div>
+        <div class="grid-3" style="margin-top: 20px;">
+          <div class="input-group"><label>Bairro</label><input type="text" name="BAIRRO" readonly></div>
+          <div class="input-group"><label>Cidade</label><input type="text" name="CIDADE_MORADIA" readonly></div>
+          <div class="input-group"><label>Naturalidade / UF</label><input type="text" name="NATURALIDADE" readonly></div>
+        </div>
+        <div class="grid-3" style="margin-top: 20px;">
+          <div class="input-group"><label>Telefone Celular</label><input type="text" name="TELEFONE_CEL" readonly></div>
+          <div class="input-group"><label>Telefone Residencial</label><input type="text" name="TELEFONE_RES" readonly></div>
+          <div class="input-group"><label>Telefone Recado</label><input type="text" name="TELEFONE_REC" readonly></div>
+        </div>
+      </div>
+
+      <!-- ================= ABA 2: INDICADOR (PASSO 2) ================= -->
+      <div id="tab-clinica" class="fieldset read-only">
+        <div class="sisrhc-header">Controle de Prazos e Diagnóstico Base</div>
+        <div class="grid-3">
+          <div class="input-group"><label>CID Inicial</label><input type="text" name="CID" readonly></div>
+          <div class="input-group" style="grid-column: span 2;"><label>Diagnóstico Extenso</label><input type="text" name="DIAGNOSTICO" readonly></div>
+        </div>
+        
+        <div class="grid-4" style="margin-top: 20px;">
+          <div class="input-group"><label>Data da 1ª Consulta</label><input type="text" name="DATA DA PRIMEIRA CONSULTA" readonly></div>
+          <div class="input-group"><label>Data Diagnóstico</label><input type="text" name="DATA DIAGNÓSTICO" readonly></div>
+          <div class="input-group"><label>Data do 1º Tratamento</label><input type="text" name="DATA DO PRIMEIRO TRATAMENTO" readonly></div>
+          <div class="input-group">
+             <label style="color: #D32F2F;">Lei 60 Dias (Dias decorridos)</label>
+             <input type="text" name="LEI 60 DIAS" readonly style="font-weight: 700; color: #D32F2F;">
+          </div>
+        </div>
+
+        <div class="sisrhc-header">Histórico Clínico</div>
+        <div class="input-group" style="margin-bottom: 20px;">
+          <label>Diagnóstico e Tratamentos Anteriores</label>
+          <textarea name="DIAGNÓSTICO E TRATAMENTOS ANTERIORES" rows="2" readonly></textarea>
+        </div>
+        <div class="input-group">
+          <label>Observações do Caso</label>
+          <textarea name="OBSERVAÇÕES" rows="3" readonly></textarea>
+        </div>
+      </div>
+
+      <!-- ================= ABA 3: REGISTRO (PASSO 4) ================= -->
+      <div id="tab-fase4" class="fieldset active">
+        
+        <div class="sisrhc-header">Itens de Caracterização do Diagnóstico</div>
+        <div class="grid-2">
+          <div class="input-group"><label>Convênio</label><select name="Convênio" id="dd-convenios"></select></div>
+          <div class="input-group"><label>Base Mais Importante para o Diagnóstico</label><select name="Base mais importante do diagnóstico" id="dd-baseDiag"></select></div>
+        </div>
+
+        <div class="sisrhc-header">Itens de Caracterização do Tumor</div>
+        <div class="grid-2">
+          <div class="input-group"><label>Localização do Tumor Primário</label><select name="Localização do tumor primário" id="dd-tumor"></select></div>
+          <div class="input-group"><label>Tipo Histológico do Tumor Primário</label><select name="Tipo histológico (CID-O)" id="dd-histologico"></select></div>
+        </div>
+
+        <div class="grid-4" style="margin-top: 20px;">
+          <div class="input-group"><label>Estadiamento cT</label><select name="Estadiamento cT" id="dd-cT"></select></div>
+          <div class="input-group"><label>Estadiamento cN</label><select name="Estadiamento cN" id="dd-cN"></select></div>
+          <div class="input-group"><label>Estadiamento cM</label><select name="Estadiamento cM" id="dd-cM"></select></div>
+          <div class="input-group"><label>Outro Estadiamento (Diferente TNM)</label><input type="text" name="Outro estadiamento"></div>
+        </div>
+
+        <div class="grid-4" style="margin-top: 20px; padding: 15px; background: #F5F5F5; border: 1px solid #E0E0E0;">
+          <div class="input-group"><label>pTNM (TNM Patológico)</label><select name="Estadiamento TNM patológico" id="dd-tnmPat"></select></div>
+          <div class="input-group"><label>Patológico - T</label><select name="Estadiamento patológico - T (0 - in situ; X-desconhecido)" id="dd-pT"></select></div>
+          <div class="input-group"><label>Patológico - N</label><select name="Estadiamento patológico - N (0- Ausência em linfonodos regionais; X-desconhecido)" id="dd-pN"></select></div>
+          <div class="input-group"><label>Patológico - M</label><select name="Estadiamento patológico - M (0 - Ausência de metástase a distância; X-desconhecido)" id="dd-pM"></select></div>
+        </div>
+
+        <div class="grid-4" style="margin-top: 20px;">
+          <div class="input-group"><label>Localização Metástase I</label><select name="Localização de metástase à distância I" class="dd-meta"></select></div>
+          <div class="input-group"><label>Localização Metástase II</label><select name="Localização de metástase à distância II" class="dd-meta"></select></div>
+          <div class="input-group"><label>Localização Metástase III</label><select name="Localização de metástase à distância III" class="dd-meta"></select></div>
+          <div class="input-group"><label>Localização Metástase IV</label><select name="Localização de metástase à distância IV" class="dd-meta"></select></div>
+        </div>
+
+        <div class="sisrhc-header">Itens de Caracterização do Primeiro Tratamento</div>
+        <div class="grid-2">
+          <div class="input-group"><label>Clínica do Início do Tratamento no Hospital</label><select name="Clínica do início do tratamento" id="dd-clinica"></select></div>
+          <div class="input-group"><label>Primeiro Tratamento Recebido no Hospital</label><select name="1º tratamento realizado no hospital" id="dd-primTrat"></select></div>
+        </div>
+        <div class="grid-2" style="margin-top: 20px;">
+          <div class="input-group"><label>Razão para a Não Realização do Tratamento</label><select name="Principal razão para não realização do primeiro tratamento no hospital" id="dd-razaoNaoTrat"></select></div>
+          <div class="input-group"><label>Estado da Doença ao Final do Primeiro Tratamento</label><select name="Estado da doença ao final do primeiro tratamento" id="dd-estadoDoenca"></select></div>
+        </div>
+
+        <div class="sisrhc-header">Seguimento e Óbito</div>
+        <div class="grid-2">
+          <div class="input-group"><label>Data do Óbito do Paciente</label><input type="date" name="Data do óbito"></div>
+          <div class="input-group"><label>Óbito por Câncer</label><select name="Óbito devido ao câncer" id="dd-obitoCancer"></select></div>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+<script>
+  // O SEGREDO DA ALTA PERFORMANCE: CACHE GLOBAL
+  let DB_DROPDOWNS = {};
+  let CACHE_PACIENTES = {}; // Guarda tudo aqui!
+
+  window.onload = function() {
+    document.getElementById('loader-text').innerText = "Montando Estrutura...";
+    
+    // 1. Busca Dropdowns
+    google.script.run
+      .withFailureHandler(err => erroCritico(err))
+      .withSuccessHandler(function(listas) {
+        if (!listas || listas.erro) { erroCritico(listas ? listas.erro : "Retorno Nulo"); return; }
+        
+        DB_DROPDOWNS = listas;
+        popularDropdowns();
+        
+        // 2. Busca o CACHE COMPLETO de pacientes
+        document.getElementById('loader-text').innerText = "Sincronizando Banco de Pacientes...";
+        google.script.run
+          .withFailureHandler(err => erroCritico(err))
+          .withSuccessHandler(function(pacientesMap) {
+            CACHE_PACIENTES = pacientesMap;
+            renderizarListaSidebar();
+            document.getElementById('loader-overlay').style.display = 'none';
+          }).obterPacientesPasso4();
+
+      }).obterListasDropdown();
+  };
+
+  function erroCritico(msg) {
+     alert("Erro de Conexão: " + msg);
+     document.getElementById('loader-text').innerText = "Erro ao carregar o sistema.";
+  }
+
+  function popularDropdowns() {
+    const pop = (id, array) => {
+      let el = document.getElementById(id);
+      if(el && array) {
+        el.innerHTML = '<option value=""></option>';
+        array.forEach(v => el.add(new Option(v, v)));
+      }
+    };
+    pop('dd-convenios', DB_DROPDOWNS.convenios); pop('dd-baseDiag', DB_DROPDOWNS.baseDiag);
+    pop('dd-tumor', DB_DROPDOWNS.tumor); pop('dd-histologico', DB_DROPDOWNS.histologico);
+    pop('dd-cT', DB_DROPDOWNS.cT); pop('dd-cN', DB_DROPDOWNS.cN); pop('dd-cM', DB_DROPDOWNS.cM);
+    pop('dd-tnmPat', DB_DROPDOWNS.tnmPat); pop('dd-pT', DB_DROPDOWNS.pT); pop('dd-pN', DB_DROPDOWNS.pN); pop('dd-pM', DB_DROPDOWNS.pM);
+    pop('dd-clinica', DB_DROPDOWNS.clinica); pop('dd-razaoNaoTrat', DB_DROPDOWNS.razaoNaoTrat);
+    pop('dd-primTrat', DB_DROPDOWNS.primTrat); pop('dd-estadoDoenca', DB_DROPDOWNS.estadoDoenca);
+    pop('dd-obitoCancer', DB_DROPDOWNS.obitoCancer);
+    
+    document.querySelectorAll('.dd-meta').forEach(el => {
+       el.innerHTML = '<option value=""></option>';
+       if(DB_DROPDOWNS.metastase) DB_DROPDOWNS.metastase.forEach(v => el.add(new Option(v, v)));
+    });
+  }
+
+  function renderizarListaSidebar() {
+    const ul = document.getElementById('lista-pacientes');
+    ul.innerHTML = '';
+    
+    // Transforma o objeto do cache em Array para varrer facilmente
+    Object.values(CACHE_PACIENTES).forEach(p => {
+      let colorClass = p._concluido ? 'status-ok' : 'status-pend';
+      let li = document.createElement('li');
+      li.className = 'patient-item';
+      li.setAttribute('data-search', (p._nome + p._prontuario).toLowerCase());
+      li.innerHTML = `
+        <div style="min-width:0;">
+          <div class="p-name" title="${p._nome}">${p._nome}</div>
+          <div class="p-pront">Prontuário: ${p._prontuario}</div>
+        </div>
+        <div class="status-dot ${colorClass}" title="${p._concluido ? 'Completo' : 'Pendente'}"></div>
+      `;
+      li.onclick = function() { 
+        document.querySelectorAll('.patient-item').forEach(i => i.classList.remove('active'));
+        this.classList.add('active');
+        abrirPacienteCacheado(p._linha); 
+      };
+      ul.appendChild(li);
+    });
+  }
+
+  function filtrarLista() {
+    let filter = document.getElementById('search-box').value.toLowerCase();
+    document.querySelectorAll('.patient-item').forEach(li => {
+      li.style.display = li.getAttribute('data-search').includes(filter) ? 'flex' : 'none';
+    });
+  }
+
+  // ABERTURA INSTANTÂNEA VIA CACHE LOCAL (Sem loading visual do Google)
+  function abrirPacienteCacheado(linha) {
+    let dados = CACHE_PACIENTES[linha];
+    if (!dados) return;
+
+    document.getElementById('btn-salvar').disabled = false;
+    document.getElementById('lbl-nome-paciente').innerText = dados._nome;
+    document.getElementById('lbl-nome-paciente').title = dados._nome;
+    document.getElementById('lbl-prontuario').innerText = "Prontuário: " + dados._prontuario + " | ID da Ficha: " + linha;
+    document.getElementById('linha-atual').value = linha;
+
+    document.getElementById('form-paciente').reset();
+    
+    let elements = document.getElementById('form-paciente').elements;
+    for (let i = 0; i < elements.length; i++) {
+      let el = elements[i];
+      if (el.name && dados[el.name] !== undefined) {
+        if(el.type === 'date' && dados[el.name]) {
+           let d = dados[el.name].toString();
+           if(d.includes('/')) {
+              let p = d.split('/');
+              if(p.length === 3) el.value = p[2] + "-" + p[1] + "-" + p[0];
+           }
+        } else {
+           el.value = dados[el.name];
+        }
+      }
+    }
+  }
+
+  function salvarPaciente() {
+    const btn = document.getElementById('btn-salvar');
+    const linha = document.getElementById('linha-atual').value;
+    if(!linha) return;
+    
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Gravando...';
+    btn.disabled = true;
+
+    let objDados = {};
+    let elements = document.getElementById('form-paciente').elements;
+    for (let i = 0; i < elements.length; i++) {
+      let el = elements[i];
+      if (el.name && !el.readOnly && el.type !== 'hidden') {
+        objDados[el.name] = el.value;
+      }
+    }
+
+    google.script.run.withSuccessHandler(function(res) {
+      btn.innerHTML = '<i class="fa-solid fa-print"></i> Gravar Ficha';
+      btn.disabled = false;
+      
+      if(res.sucesso) {
+         // Atualiza o Cache Local instantaneamente para não precisar recarregar o app
+         for (var k in objDados) { CACHE_PACIENTES[linha][k] = objDados[k]; }
+         CACHE_PACIENTES[linha]._concluido = (objDados["Estadiamento cT"] && objDados["Estadiamento cT"] !== "");
+         
+         // Atualiza o pontinho na lista
+         let activeLi = document.querySelector('.patient-item.active .status-dot');
+         if(activeLi) activeLi.className = 'status-dot ' + (CACHE_PACIENTES[linha]._concluido ? 'status-ok' : 'status-pend');
+         
+      } else {
+         alert("❌ Erro ao Gravar: " + res.erro);
+      }
+    }).salvarPacienteGestor(linha, objDados);
+  }
+
+  function switchFormTab(tabId, tabElement) {
+    document.querySelectorAll('.f-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.fieldset').forEach(f => f.classList.remove('active'));
+    tabElement.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+</script>
+</body>
+</html>
