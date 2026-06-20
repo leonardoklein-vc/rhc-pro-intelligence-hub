@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('style'); ?>
+  </head>
+  <body>
+    
+    <nav class="nav-tabs">
+      <button class="nav-item disabled" id="tab-Q" onclick="switchView('Q', this)">Q</button>
+      <button class="nav-item disabled" id="tab-1" onclick="switchView(1, this)">1</button>
+      <button class="nav-item disabled" id="tab-2" onclick="switchView(2, this)">2</button>
+      <button class="nav-item disabled" id="tab-3" onclick="switchView(3, this)">3</button>
+      <button class="nav-item disabled" id="tab-4" onclick="switchView(4, this)">4</button>
+    </nav>
+
+    <div class="loader-container" id="loader">
+      <i class="fa-solid fa-spinner"></i> Processando...
+    </div>
+    <div id="notification"></div>
+
+    <div id="viewQ" class="view">
+      <div class="header"><h2>PASSO 0: INICIALIZAÇÃO</h2></div>
+      <div class="container">
+        <div class="step-card">
+          <div class="step-title"><i class="fa-solid fa-file-import"></i> Migração de Query</div>
+          <p class="step-desc">Este arquivo foi identificado como uma Query bruta. Inicie o fluxo para criar a estrutura do mês e copiá-lo para o Passo 01.</p>
+          <button class="action-btn btn-gerar-fluxo" onclick="runStep('executarPassoZero', this)"><i class="fa-solid fa-copy"></i> Iniciar Fluxo RHC Pro</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="view1" class="view">
+      <div class="header"><h2>PASSO 1: PREPARAÇÃO</h2></div>
+      <div class="container">
+        
+        <div class="step-card">
+          <div class="step-title">
+            <i class="fa-solid fa-table-columns"></i> 1. Ajuste Estrutural
+            <span class="tooltip"><i class="fa-solid fa-circle-question"></i>
+              <span class="tooltiptext">Renomeia a aba para "Indicadores", insere as colunas essenciais (D a J) e autoajusta as larguras.</span>
+            </span>
+          </div>
+          <button class="action-btn" onclick="runStep('verificarHeaders', this)"><i class="fa-solid fa-wand-magic-sparkles"></i> Executar Comando 1</button>
+        </div>
+
+        <div class="step-card">
+          <div class="step-title">
+            <i class="fa-solid fa-database"></i> 2. Banco de Dados (BD)
+            <span class="tooltip"><i class="fa-solid fa-circle-question"></i>
+              <span class="tooltiptext">Copia a aba 'BD Exemplo' da planilha mestre externa.</span>
+            </span>
+          </div>
+          <button class="action-btn" onclick="runStep('copiarBDExemplo', this)"><i class="fa-solid fa-folder-plus"></i> Executar Comando 2</button>
+        </div>
+
+        <div class="step-card">
+          <div class="step-title">
+            <i class="fa-solid fa-check-double"></i> 3. Validações e Filtros
+            <span class="tooltip"><i class="fa-solid fa-circle-question"></i>
+              <span class="tooltiptext">Aplica regras de dados iniciais, formata Datas e ativa o Filtro Mestre.</span>
+            </span>
+          </div>
+          <button class="action-btn" onclick="runStep('aplicarValidacoesIniciais', this)"><i class="fa-solid fa-gears"></i> Executar Comando 3</button>
+        </div>
+
+        <div class="step-card">
+          <div class="step-title">
+            <i class="fa-solid fa-users-slash"></i> 4. Checar Duplicados
+            <span class="tooltip"><i class="fa-solid fa-circle-question"></i>
+              <span class="tooltiptext">Cruza os pacientes locais com o Histórico filtrando os últimos 12 meses.</span>
+            </span>
+          </div>
+          <button class="action-btn" style="background:#e67e22" onclick="iniciarCheckDuplicados(this)"><i class="fa-solid fa-magnifying-glass"></i> Executar Comando 4</button>
+          <div id="log-terminal" style="display:none; margin-top:15px; background:#1e1e1e; color:#00ff00; padding:10px; border-radius:4px; font-family:monospace; font-size:11px; height:150px; overflow-y:auto; border:1px solid #333; line-height:1.4;"></div>
+        </div>
+
+        <button id="lock-btn-1" class="lock-btn" onclick="bloquearPasso(1)" ondblclick="desbloquearPasso(1)">
+          <i class="fa-solid fa-shield-halved"></i> Concluir Passo 1
+        </button>
+
+        <div id="next-step-container-1" style="display:none;">
+          <button class="action-btn btn-gerar-fluxo next-step-btn" onclick="runStep('gerarProximoPasso', this)">
+            <i class="fa-solid fa-forward-step"></i> Gerar Arquivo: Passo 02
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="view2" class="view">
+      <div class="header"><h2>PASSO 2: INDICADORES</h2></div>
+      <div class="container">
+        
+        <div class="step-card" style="border-left-color: #9b59b6;">
+            <div class="section-label"><i class="fa-solid fa-fill-drip"></i> Pincel de Status</div>
+            <p class="step-desc">Selecione uma linha na planilha e clique na cor correspondente.</p>
+            
+            <div class="swatch-container">
+              <div class="swatch" style="background:#ff0000;" onclick="colorRow('#ff0000')" title="+ de 60 dias"></div>
+              <div class="swatch" style="background:#00ff00;" onclick="colorRow('#00ff00')" title="60 dias ou -"></div>
+              <div class="swatch" style="background:#ffff00;" onclick="colorRow('#ffff00')" title="Pele/Tireóide"></div>
+              <div class="swatch" style="background:#ff9900;" onclick="colorRow('#ff9900')" title="Excluído/Óbito"></div>
+              <div class="swatch" style="background:#00ffff;" onclick="colorRow('#00ffff')" title="Sem Conduta Fechada"></div>
+              <div class="swatch" style="background:#ff00ff;" onclick="colorRow('#ff00ff')" title="Futuro"></div>
+              <div class="swatch" style="background:#808080;" onclick="colorRow('#808080')" title="Duplicado"></div>
+              <div class="swatch" style="background:#d3d3d3;" onclick="colorRow('#d3d3d3')" title="Duplicado: C44"></div>
+              <div class="swatch" style="background:#000000;" onclick="colorRow('#000000')" title="Atenção/Revisar"></div>
+              <div class="swatch white" style="background:#ffffff;" onclick="colorRow('#ffffff')" title="Limpar (Branco)"><i class="fa-solid fa-eraser"></i></div>
+            </div>
+        </div>
+
+        <div class="step-card" style="border-left-color: #3498db; margin-top: 10px;">
+            <div class="section-label"><i class="fa-solid fa-filter"></i> Filtro de Exibição</div>
+            <p class="step-desc">Selecione os status que deseja visualizar e confirme abaixo.</p>
+            
+            <div class="pill-container">
+               <button class="filter-pill active" id="pill-TODAS" onclick="toggleLocalFilter('TODAS')">Todas</button>
+               <button class="filter-pill" id="pill-#ff0000" onclick="toggleLocalFilter('#ff0000')"><span style="color:#ff0000">●</span> +60 dias</button>
+               <button class="filter-pill" id="pill-#00ff00" onclick="toggleLocalFilter('#00ff00')"><span style="color:#00ff00">●</span> ≤60 dias</button>
+               <button class="filter-pill" id="pill-#ffff00" onclick="toggleLocalFilter('#ffff00')"><span style="color:#f1c40f">●</span> Pele/Tir.</button>
+               <button class="filter-pill" id="pill-#ff9900" onclick="toggleLocalFilter('#ff9900')"><span style="color:#ff9900">●</span> Excl./Óbito</button>
+               <button class="filter-pill" id="pill-#00ffff" onclick="toggleLocalFilter('#00ffff')"><span style="color:#00ffff">●</span> S. Conduta</button>
+               <button class="filter-pill" id="pill-#ff00ff" onclick="toggleLocalFilter('#ff00ff')"><span style="color:#ff00ff">●</span> Futuro</button>
+               <button class="filter-pill" id="pill-#808080" onclick="toggleLocalFilter('#808080')"><span style="color:#808080">●</span> Dup.</button>
+               <button class="filter-pill" id="pill-#d3d3d3" onclick="toggleLocalFilter('#d3d3d3')"><span style="color:#bdc3c7">●</span> C44</button>
+               <button class="filter-pill" id="pill-#000000" onclick="toggleLocalFilter('#000000')"><span style="color:#000000">●</span> Revisar</button>
+            </div>
+
+            <button class="action-btn" style="margin-top: 15px; background: #3498db;" onclick="confirmarFiltros()">
+              <i class="fa-solid fa-check"></i> Aplicar Filtros Selecionados
+            </button>
+        </div>
+
+        <button id="lock-btn-2" class="lock-btn" onclick="bloquearPasso(2)" ondblclick="desbloquearPasso(2)">
+          <i class="fa-solid fa-shield-halved"></i> Concluir Passo 2
+        </button>
+
+        <div id="next-step-container-2" style="display:none;">
+          <button class="action-btn btn-gerar-fluxo next-step-btn" onclick="runStep('gerarProximoPasso', this)">
+            <i class="fa-solid fa-forward-step"></i> Gerar Arquivo: Passo 03
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="view3" class="view">
+      <div class="header"><h2>PASSO 3: DADOS CLÍNICOS</h2></div>
+      <div class="container">
+        
+        <div class="step-card">
+          <div class="step-title">
+            <i class="fa-solid fa-notes-medical"></i> 1. Inserir Colunas Clínicas
+            <span class="tooltip"><i class="fa-solid fa-circle-question"></i>
+              <span class="tooltiptext">Cria as 22 colunas de estadiamento e tratamento clínico entre as colunas J e K atuais.</span>
+            </span>
+          </div>
+          <button class="action-btn" onclick="runStep('inserirColunasClinicas', this)"><i class="fa-solid fa-table-columns"></i> Executar Comando 1</button>
+        </div>
+
+        <div class="step-card">
+          <div class="step-title">
+            <i class="fa-solid fa-file-signature"></i> 2. Validar Colunas Clínicas
+            <span class="tooltip"><i class="fa-solid fa-circle-question"></i>
+              <span class="tooltiptext">Aplica as regras de seleção (menus suspensos) e validação de data em todas as colunas.</span>
+            </span>
+          </div>
+          <button class="action-btn" onclick="runStep('aplicarValidacoesClinicas', this)"><i class="fa-solid fa-check-double"></i> Executar Comando 2</button>
+        </div>
+
+        <button id="lock-btn-3" class="lock-btn" onclick="bloquearPasso(3)" ondblclick="desbloquearPasso(3)">
+          <i class="fa-solid fa-shield-halved"></i> Concluir Passo 3
+        </button>
+
+        <div id="next-step-container-3" style="display:none;">
+          <button class="action-btn btn-gerar-fluxo next-step-btn" onclick="runStep('gerarProximoPasso', this)">
+            <i class="fa-solid fa-forward-step"></i> Gerar Arquivo: Passo 04
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+   <div id="view4" class="view">
+      <div class="header"><h2 style="color:var(--rhc-accent);">PASSO 4: REGISTRO RHC</h2></div>
+      <div class="container">
+        
+        <div class="step-card" style="border-left-color: var(--rhc-accent); text-align: center;">
+          <div class="step-title" style="justify-content: center;">
+            <i class="fa-solid fa-chart-pie"></i> Progresso do Mês
+          </div>
+          
+          <!-- Container das Estatísticas -->
+          <div id="stats-container" style="margin: 15px 0; background: #fdfbf7; padding: 15px; border-radius: 8px; border: 1px solid #fae5b6;">
+             <h1 id="stat-pct" style="font-size: 36px; margin: 0; color: var(--text-dark);">--%</h1>
+             <p style="margin: 5px 0 15px 0; font-size: 11px; color: var(--text-muted);">Estadiamentos Concluídos</p>
+             
+             <div style="display: flex; justify-content: space-around; font-size: 12px; font-weight: bold;">
+                <div style="color: var(--color-success);"><span id="stat-ok">--</span><br><span style="font-size:10px; font-weight:normal; color:#7f8c8d;">Prontos</span></div>
+                <div style="color: var(--color-danger);"><span id="stat-pend">--</span><br><span style="font-size:10px; font-weight:normal; color:#7f8c8d;">Pendentes</span></div>
+                <div style="color: var(--text-dark);"><span id="stat-tot">--</span><br><span style="font-size:10px; font-weight:normal; color:#7f8c8d;">Total Pacientes</span></div>
+             </div>
+          </div>
+
+          <!-- Botão de Abertura do Sistema Grande -->
+          <button class="action-btn" style="background-color: var(--rhc-accent); color: var(--text-dark) !important; padding: 15px; font-size: 14px; margin-top: 10px;" onclick="google.script.run.abrirRegistroRHC()">
+            <i class="fa-solid fa-laptop-medical"></i> Abrir Registro RHC
+          </button>
+          <p class="step-desc" style="margin-top: 15px;">Abre a interface avançada para visualização de demográficos e preenchimento da ficha no padrão SISRHC.</p>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+    <script>
+  let currentStep = "DESCONHECIDO";
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const loader = document.getElementById('loader');
+    loader.style.display = 'block';
+
+    google.script.run
+      .withSuccessHandler(function(ctx) {
+        loader.style.display = 'none';
+        ajustarInterfacePorContexto(ctx);
+        
+        if (ctx.proximoGerado && ctx.urlProximo) {
+          let btnGerar = document.querySelector('.view.active .action-btn.btn-gerar-fluxo');
+          
+          if (btnGerar) {
+            btnGerar.style.backgroundColor = '#95a5a6';
+            btnGerar.style.cursor = 'default';
+            btnGerar.disabled = true;
+            btnGerar.innerHTML = '<i class="fa-solid fa-check"></i> Próximo Passo já Gerado';
+
+            let linkBtn = document.createElement('a');
+            linkBtn.href = ctx.urlProximo;
+            linkBtn.target = '_blank';
+            linkBtn.className = 'action-btn btn-next-step';
+            linkBtn.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir Passo ' + ctx.passoSeguinte;
+            btnGerar.parentNode.insertBefore(linkBtn, btnGerar.nextSibling);
+          }
+        }
+        
+        google.script.run.withSuccessHandler(function(estados) {
+          if (estados.passo1 && ctx.passo == "1") aplicarVisualBloqueado(1);
+          if (estados.passo2 && ctx.passo == "2") aplicarVisualBloqueado(2);
+          if (estados.passo3 && ctx.passo == "3") aplicarVisualBloqueado(3);
+        }).carregarEstadosBloqueio();
+
+      }).obterContextoAtual();
+  });
+
+  function ajustarInterfacePorContexto(ctx) {
+    currentStep = ctx.passo;
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.classList.add('disabled');
+      btn.style.pointerEvents = 'none';
+    });
+
+    if (ctx.passo !== "BLOQUEADO" && ctx.passo !== "DESCONHECIDO") {
+      const activeTab = document.getElementById('tab-' + ctx.passo);
+      if (activeTab) {
+        activeTab.classList.remove('disabled');
+        activeTab.style.pointerEvents = 'auto';
+        switchView(ctx.passo, activeTab);
+      }
+    } else {
+       showNotification("⚠️ Arquivo fora da estrutura ou cabeçalhos inválidos.", "error");
+    }
+  }
+
+  function showNotification(msg, type) {
+    const notif = document.getElementById('notification');
+    notif.className = type;
+    let icon = type === 'success' ? '<i class="fa-solid fa-circle-check"></i> ' : '<i class="fa-solid fa-triangle-exclamation"></i> ';
+    notif.innerHTML = icon + msg;
+    notif.style.display = 'block';
+    setTimeout(() => { notif.style.display = 'none'; }, 6000);
+  }
+
+  function switchView(step, btn) {
+  if(btn.classList.contains('disabled')) return;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view' + step).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('notification').style.display = 'none';
+
+  // Lógica extra: Se abriu a aba 4, carregar estatísticas
+  if(step == 4) {
+     carregarEstatisticasPasso4();
+  }
+}
+
+function carregarEstatisticasPasso4() {
+  document.getElementById('stat-pct').innerText = '...';
+  google.script.run.withSuccessHandler(function(res){
+    if(res.erro) {
+       showNotification(res.erro, "error");
+    } else {
+       document.getElementById('stat-pct').innerText = res.pct + '%';
+       document.getElementById('stat-ok').innerText = res.concluidos;
+       document.getElementById('stat-pend').innerText = res.pendentes;
+       document.getElementById('stat-tot').innerText = res.total;
+    }
+  }).obterEstatisticasPasso4();
+}
+
+  function aplicarVisualBloqueado(viewId) {
+    const view = document.getElementById('view' + viewId);
+    const btn = document.getElementById('lock-btn-' + viewId);
+    const nextContainer = document.getElementById('next-step-container-' + viewId);
+    if (!view || !btn) return;
+    view.querySelectorAll('.step-card .action-btn:not(.btn-gerar-fluxo)').forEach(b => b.disabled = true);
+    view.querySelectorAll('.swatch, .filter-pill').forEach(b => { b.style.pointerEvents = 'none'; b.style.opacity = '0.5'; });
+    btn.classList.add('locked');
+    btn.innerHTML = '<i class="fa-solid fa-lock"></i> Passo Concluído (Duplo clique para destravar)';
+    if(nextContainer) nextContainer.style.display = 'block';
+  }
+
+  function aplicarVisualDesbloqueado(viewId) {
+    const view = document.getElementById('view' + viewId);
+    const btn = document.getElementById('lock-btn-' + viewId);
+    const nextContainer = document.getElementById('next-step-container-' + viewId);
+    if (!view || !btn) return;
+    view.querySelectorAll('.step-card .action-btn:not(.btn-gerar-fluxo)').forEach(b => b.disabled = false);
+    view.querySelectorAll('.swatch, .filter-pill').forEach(b => { b.style.pointerEvents = 'auto'; b.style.opacity = '1'; });
+    btn.classList.remove('locked');
+    btn.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Concluir Passo ' + viewId;
+    if(nextContainer) nextContainer.style.display = 'none';
+  }
+
+  function bloquearPasso(viewId) {
+    const btn = document.getElementById('lock-btn-' + viewId);
+    if(btn.classList.contains('locked')) return; 
+    aplicarVisualBloqueado(viewId);
+    google.script.run.salvarEstadoBloqueio(viewId, true);
+    showNotification("Passo concluído com sucesso.", "success");
+  }
+
+  function desbloquearPasso(viewId) {
+    const btn = document.getElementById('lock-btn-' + viewId);
+    if(!btn.classList.contains('locked')) return;
+    if(confirm("Deseja realmente destravar as edições deste passo?")) {
+      aplicarVisualDesbloqueado(viewId);
+      google.script.run.salvarEstadoBloqueio(viewId, false);
+    }
+  }
+
+  function runStep(functionName, btn) {
+    const loader = document.getElementById('loader');
+    const notif = document.getElementById('notification');
+    notif.style.display = 'none';
+    loader.style.display = 'block';
+    btn.disabled = true;
+
+    if(functionName === 'executarPassoZero' || functionName === 'gerarProximoPasso') {
+       functionName = functionName === 'executarPassoZero' ? 'executarMigracaoQParaPasso01' : 'gerarProximoPasso';
+    }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        loader.style.display = 'none';
+        let isObject = (typeof res === 'object' && res !== null);
+        let msgErro = isObject ? res.erro : null;
+        let msgSucesso = isObject ? res.msg : res;
+        let url = isObject ? res.url : null;
+        let targetStep = isObject ? res.passoGerado : null;
+
+        if(msgErro && !url) { 
+          showNotification(msgErro, "error"); 
+          btn.disabled = false; 
+        } 
+        else { 
+          if(msgErro && url) showNotification(msgErro, "error");
+          else showNotification(msgSucesso, "success"); 
+          
+          if (url) {
+            btn.style.backgroundColor = '#95a5a6';
+            btn.style.cursor = 'default';
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Arquivo Gerado';
+            
+            let linkBtn = document.createElement('a');
+            linkBtn.href = url;
+            linkBtn.target = '_blank';
+            linkBtn.className = 'action-btn btn-next-step';
+            linkBtn.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir Passo ' + targetStep;
+            btn.parentNode.insertBefore(linkBtn, btn.nextSibling);
+          } else {
+            btn.disabled = false; 
+          }
+        }
+      })
+      .withFailureHandler(function(err) {
+        loader.style.display = 'none';
+        btn.disabled = false;
+        showNotification("Falha na rede: " + err, "error");
+      })
+      [functionName]();
+  }
+
+  function colorRow(hex) {
+    const loader = document.getElementById('loader');
+    loader.style.display = 'block';
+    google.script.run
+      .withSuccessHandler(() => { loader.style.display = 'none'; })
+      .withFailureHandler((err) => { loader.style.display = 'none'; showNotification("Erro: " + err, "error"); })
+      .pintarLinhaSelecionada(hex);
+  }
+
+  let coresSelecionadasLocal = ['TODAS'];
+  function toggleLocalFilter(corHex) {
+    const pillTodas = document.getElementById('pill-TODAS');
+    if (corHex === 'TODAS') {
+      coresSelecionadasLocal = ['TODAS'];
+      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      pillTodas.classList.add('active');
+    } else {
+      const idxTodas = coresSelecionadasLocal.indexOf('TODAS');
+      if (idxTodas > -1) {
+        coresSelecionadasLocal.splice(idxTodas, 1);
+        pillTodas.classList.remove('active');
+      }
+      const idxCor = coresSelecionadasLocal.indexOf(corHex);
+      if (idxCor > -1) {
+        coresSelecionadasLocal.splice(idxCor, 1);
+        document.getElementById('pill-' + corHex).classList.remove('active');
+      } else {
+        coresSelecionadasLocal.push(corHex);
+        document.getElementById('pill-' + corHex).classList.add('active');
+      }
+      if (coresSelecionadasLocal.length === 0) {
+        coresSelecionadasLocal = ['TODAS'];
+        pillTodas.classList.add('active');
+      }
+    }
+  }
+
+  function confirmarFiltros() {
+    const loader = document.getElementById('loader');
+    loader.style.display = 'block';
+    google.script.run
+      .withSuccessHandler((msg) => { loader.style.display = 'none'; showNotification(msg, "success"); })
+      .withFailureHandler((err) => { loader.style.display = 'none'; showNotification("Erro: " + err, "error"); })
+      .filtrarLinhasPorCoresMulti(coresSelecionadasLocal);
+  }
+
+  function iniciarCheckDuplicados(btn) {
+    const loader = document.getElementById('loader');
+    const terminal = document.getElementById('log-terminal');
+    terminal.style.display = 'none';
+    loader.style.display = 'block';
+    btn.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(function(sugestao) {
+        loader.style.display = 'none';
+        let dataAlvo = prompt("Mês de Referência (MM/AAAA):", sugestao || "");
+        if (!dataAlvo) { btn.disabled = false; return; }
+        terminal.style.display = 'block';
+        terminal.innerHTML = "Varrendo registros...<br>";
+        
+        google.script.run
+          .withSuccessHandler(function(resposta) {
+            btn.disabled = false;
+            if (resposta && resposta.logs) terminal.innerHTML = resposta.logs.join("<br>");
+            showNotification(resposta.msg, "success");
+          })
+          .withFailureHandler(function(err) {
+            terminal.innerHTML += "<br><span style='color:red'>ERRO: " + err + "</span>";
+            btn.disabled = false;
+          })
+          .executarVerificacaoDuplicados(dataAlvo);
+      })
+      .withFailureHandler(function(err) {
+        loader.style.display = 'none';
+        btn.disabled = false;
+      })
+      .sugerirMesReferencia();
+  }
+</script>
+  </body>
+</html>
