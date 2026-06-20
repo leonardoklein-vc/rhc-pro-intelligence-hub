@@ -1,0 +1,3274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel RHC HCPA</title>
+  
+  <?!= include('StylePainel2'); ?>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+  <!-- ADICIONE ESTA LINHA: Motor de Geração de PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body data-theme="hcpa">
+
+  <div id="loader" class="loader-overlay">
+    <div class="data-core-loader">
+      <div class="ring outer-ring"></div>
+      <div class="ring inner-ring"></div>
+      <div class="core-dot"></div>
+    </div>
+    <h2 style="margin:0; color: #ffffff; font-weight: 700; letter-spacing: -0.5px; font-size: 18px;">
+      Iniciando RHC Pro
+    </h2>
+    <p id="loader-msg">
+      Sincronizando dados institucionais...
+    </p>
+  </div>
+
+  <div class="layout-wrapper">
+    <div id="mobile-overlay" class="mobile-overlay" onclick="toggleSidebar()"></div>
+
+    <aside class="sidebar">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 5px;">
+        <div style="background: rgba(56, 189, 248, 0.1); color: var(--accent); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <div>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.5px;">Painel BI RHC</h2>
+          <span style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Dashboard HCPA</span>
+        </div>
+      </div>
+
+      <div class="control-group" style="padding: 10px; background: rgba(56, 189, 248, 0.05); border-color: rgba(56, 189, 248, 0.2);">
+        <label class="control-label" style="color: var(--accent);">
+          <i class="fa-solid fa-eye"></i> Visão Principal (Perspectiva)
+        </label>
+        <select id="select-perspectiva" style="padding: 8px; font-weight: bold; color: var(--text-main); border-color: var(--accent);" onchange="mudarPerspectiva(this.value)">
+          <option value="cores" selected>Cores (Lei 60 Dias)</option>
+          <option value="grupocid">Grupos de CID (Sítio)</option> 
+          <option value="idade">Faixa Etária</option>
+          <option value="sexo">Sexo do Paciente</option>
+          <option value="etnia">Etnia Declarada</option>
+          <option value="diagtrat">Diag. e Tratamento</option>
+          <option value="obito">Desfecho Clínico</option>
+        </select>
+      </div>
+
+      <div id="sub-menu-cid" class="control-group" style="display: none; padding: 10px; background: rgba(139, 92, 246, 0.05); border-color: rgba(139, 92, 246, 0.2); margin-top: -5px;">
+        <label class="control-label" style="color: var(--purple);"><i class="fa-solid fa-sitemap"></i> Nível de Agrupamento</label>
+        <select id="select-sub-cid" style="padding: 8px; font-weight: bold; margin-bottom: 5px;" onchange="mudarSubPerspectivaCid()">
+          <option value="padrao" selected>Padrão (14 Grupos)</option>
+          <option value="detalhado">Detalhado OMS (32 Grupos)</option>
+          <option value="especifico">Monitoramento Específico...</option>
+        </select>
+        <button id="btn-escolher-cids" class="btn-action" style="display: none; background: var(--purple); padding: 8px;" onclick="abrirModalSelecaoCids()">
+          <i class="fa-solid fa-magnifying-glass-chart"></i> Selecionar CIDs
+        </button>
+      </div>
+
+      <div class="control-group" style="padding: 10px; background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2);">
+        <label class="control-label" style="color: var(--verde);">
+          <i class="fa-regular fa-calendar-alt"></i> Modelo de Calendário
+        </label>
+        <select id="select-modelo-calendario" style="padding: 8px; font-weight: bold; color: var(--text-main); border-color: var(--verde);" onchange="mudarModeloCalendario()">
+          <option value="RHC" selected>Ciclo PNGE (Out a Set)</option>
+          <option value="CIVIL">Ano Civil HCPA (Jan a Dez)</option>
+        </select>
+      </div>
+
+      <div class="control-group" style="padding: 10px;">
+        <label class="control-label">0. Período Oficial</label>
+        <select id="select-ano-rhc" style="padding: 8px; margin-bottom: 5px;" onchange="buscarDadosDoServidor()"></select>
+      </div>
+
+      <div class="control-group" style="padding: 10px;">
+        <label class="control-label" id="lbl-componentes">2. Componentes</label>
+        <div style="display: flex; gap: 5px;" id="botoes-componentes"></div>
+        <div id="container-componentes" class="grid-checkboxes"></div>
+      </div>
+
+      <div class="control-group" style="padding: 10px;">
+        <label class="control-label">
+           <span>3. Filtros Secundários</span>
+           <div style="display: flex; gap: 4px;">
+              <span class="sec-filter-btn" style="color: var(--verde); font-size: 8px;" onclick="marcarTodosFiltrosSidebar(true)">[Marcar Todos]</span>
+              <span class="sec-filter-btn" style="color: #ef4444; font-size: 8px;" onclick="marcarTodosFiltrosSidebar(false)">[Limpar]</span>
+           </div>
+        </label>
+        
+        <label class="sec-filter-title">CID DIAGNÓSTICO</label>
+        <select id="filtro-cid" onchange="aplicarFiltrosLocais()" style="padding: 8px; margin-bottom: 12px; font-size:11px; color: var(--accent); font-weight: 700; border-color: var(--accent);">
+          <option value="">Todos os CIDs</option>
+        </select>
+
+        <div id="sec-group-grupocid" class="sec-filter-block">
+          <div class="sec-filter-header">
+            <label class="sec-filter-title">GRUPOS DE CID</label>
+            <div class="sec-filter-actions">
+              <span class="sec-filter-btn" onclick="marcarSecundario('grupocid', true)">Todos</span>
+              <span class="sec-filter-btn" onclick="marcarSecundario('grupocid', false)">Nenhum</span>
+            </div>
+          </div>
+          <div class="grid-checkboxes" style="grid-template-columns: 1fr; max-height: 150px; overflow-y: auto;">
+            <label class="check-item"><input type="checkbox" value="C00-C14" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C00-C14 - Lábio, Cav. Oral e Faringe</label>
+            <label class="check-item"><input type="checkbox" value="C15-C26" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C15-C26 - Órgãos Digestivos</label>
+            <label class="check-item"><input type="checkbox" value="C30-C39" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C30-C39 - Aparelho Respiratório</label>
+            <label class="check-item"><input type="checkbox" value="C40-C41" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C40-C41 - Ossos e Cartilagens</label>
+            <label class="check-item"><input type="checkbox" value="C43-C44" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C43-C44 - Pele (Melanomas)</label>
+            <label class="check-item"><input type="checkbox" value="C45-C49" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C45-C49 - Tec. Mesotelial/Moles</label>
+            <label class="check-item"><input type="checkbox" value="C50"      class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C50 - Mama</label>
+            <label class="check-item"><input type="checkbox" value="C51-C58" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C51-C58 - Genitais Femininos</label>
+            <label class="check-item"><input type="checkbox" value="C60-C63" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C60-C63 - Genitais Masculinos</label>
+            <label class="check-item"><input type="checkbox" value="C64-C68" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C64-C68 - Trato Urinário</label>
+            <label class="check-item"><input type="checkbox" value="C69-C72" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C69-C72 - SNC e Olhos</label>
+            <label class="check-item"><input type="checkbox" value="C73-C75" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C73-C75 - Glând. Endócrinas</label>
+            <label class="check-item"><input type="checkbox" value="C76-C80" class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> C76-C80 - Mal Definidas/Secund.</label>
+            <label class="check-item"><input type="checkbox" value="OUTROS"  class="chk-sec-grupocid" onchange="aplicarFiltrosLocais()" checked> Outros / Sem Info</label>
+          </div>
+        </div>
+
+        <div id="sec-group-cores" class="sec-filter-block">
+          <div class="sec-filter-header">
+            <label class="sec-filter-title">COR (LEI 60)</label>
+            <div class="sec-filter-actions">
+              <span class="sec-filter-btn" onclick="marcarSecundario('cores', true)">Todos</span>
+              <span class="sec-filter-btn" onclick="marcarSecundario('cores', false)">Nenhum</span>
+              <span class="sec-filter-btn" onclick="marcarSecundario('cores', 'indicador')">Ind</span>
+            </div>
+          </div>
+          <div class="grid-checkboxes" style="grid-template-columns: 1fr 1fr;">
+            <label class="check-item"><input type="checkbox" value="verde" class="chk-sec-cores" onchange="aplicarFiltrosLocais()" checked> <div style="width:8px;height:8px;border-radius:50%;background:var(--verde)"></div>Verde</label>
+            <label class="check-item"><input type="checkbox" value="vermelho" class="chk-sec-cores" onchange="aplicarFiltrosLocais()" checked> <div style="width:8px;height:8px;border-radius:50%;background:var(--vermelho)"></div>Vermelho</label>
+            <label class="check-item"><input type="checkbox" value="ciano" class="chk-sec-cores" onchange="aplicarFiltrosLocais()" checked> <div style="width:8px;height:8px;border-radius:50%;background:var(--ciano)"></div>Ciano</label>
+            <label class="check-item"><input type="checkbox" value="amarelo" class="chk-sec-cores" onchange="aplicarFiltrosLocais()" checked> <div style="width:8px;height:8px;border-radius:50%;background:var(--amarelo)"></div>Amarelo</label>
+            <label class="check-item"><input type="checkbox" value="laranja" class="chk-sec-cores" onchange="aplicarFiltrosLocais()" checked> <div style="width:8px;height:8px;border-radius:50%;background:var(--laranja)"></div>Laranja</label>
+            <label class="check-item"><input type="checkbox" value="magenta" class="chk-sec-cores" onchange="aplicarFiltrosLocais()" checked> <div style="width:8px;height:8px;border-radius:50%;background:var(--magenta)"></div>Magenta</label>
+            <label class="check-item"><input type="checkbox" value="branco" class="chk-sec-cores" onchange="aplicarFiltrosLocais()" checked> <div style="width:8px;height:8px;border-radius:50%;background:var(--branco)"></div>Branco</label>
+          </div>
+        </div>
+
+        <div id="sec-group-idade" class="sec-filter-block">
+          <div class="sec-filter-header">
+            <label class="sec-filter-title">FAIXA ETÁRIA</label>
+            <div class="sec-filter-actions">
+              <span class="sec-filter-btn" onclick="marcarSecundario('idade', true)">Todos</span>
+              <span class="sec-filter-btn" onclick="marcarSecundario('idade', false)">Nenhum</span>
+            </div>
+          </div>
+          <div class="grid-checkboxes" style="grid-template-columns: 1fr 1fr;">
+            <label class="check-item"><input type="checkbox" value="0-17" class="chk-sec-idade" onchange="aplicarFiltrosLocais()" checked> Menor que 18</label>
+            <label class="check-item"><input type="checkbox" value="18-39" class="chk-sec-idade" onchange="aplicarFiltrosLocais()" checked> 18 a 39</label>
+            <label class="check-item"><input type="checkbox" value="40-59" class="chk-sec-idade" onchange="aplicarFiltrosLocais()" checked> 40 a 59</label>
+            <label class="check-item"><input type="checkbox" value="60+" class="chk-sec-idade" onchange="aplicarFiltrosLocais()" checked> 60 ou mais</label>
+            <label class="check-item"><input type="checkbox" value="sem_idade" class="chk-sec-idade" onchange="aplicarFiltrosLocais()" checked> Sem Info</label>
+          </div>
+        </div>
+
+        <div id="sec-group-sexo" class="sec-filter-block">
+          <div class="sec-filter-header">
+            <label class="sec-filter-title">SEXO DO PACIENTE</label>
+            <div class="sec-filter-actions">
+              <span class="sec-filter-btn" onclick="marcarSecundario('sexo', true)">Todos</span>
+              <span class="sec-filter-btn" onclick="marcarSecundario('sexo', false)">Nenhum</span>
+            </div>
+          </div>
+          <div class="grid-checkboxes" style="grid-template-columns: 1fr 1fr;">
+            <label class="check-item"><input type="checkbox" value="M" class="chk-sec-sexo" onchange="aplicarFiltrosLocais()" checked> Masculino</label>
+            <label class="check-item"><input type="checkbox" value="F" class="chk-sec-sexo" onchange="aplicarFiltrosLocais()" checked> Feminino</label>
+            <label class="check-item"><input type="checkbox" value="sem_sexo" class="chk-sec-sexo" onchange="aplicarFiltrosLocais()" checked> Sem Info</label>
+          </div>
+        </div>
+
+        <div id="sec-group-etnia" class="sec-filter-block">
+          <div class="sec-filter-header">
+            <label class="sec-filter-title">ETNIA DECLARADA</label>
+            <div class="sec-filter-actions">
+              <span class="sec-filter-btn" onclick="marcarSecundario('etnia', true)">Todos</span>
+              <span class="sec-filter-btn" onclick="marcarSecundario('etnia', false)">Nenhum</span>
+            </div>
+          </div>
+          <div class="grid-checkboxes" style="grid-template-columns: 1fr 1fr;">
+            <label class="check-item"><input type="checkbox" value="BRANCA" class="chk-sec-etnia" onchange="aplicarFiltrosLocais()" checked> Branca</label>
+            <label class="check-item"><input type="checkbox" value="PRETA" class="chk-sec-etnia" onchange="aplicarFiltrosLocais()" checked> Preta</label>
+            <label class="check-item"><input type="checkbox" value="PARDA" class="chk-sec-etnia" onchange="aplicarFiltrosLocais()" checked> Parda</label>
+            <label class="check-item"><input type="checkbox" value="AMARELA" class="chk-sec-etnia" onchange="aplicarFiltrosLocais()" checked> Amarela</label>
+            <label class="check-item"><input type="checkbox" value="INDIGENA" class="chk-sec-etnia" onchange="aplicarFiltrosLocais()" checked> Indígena</label>
+            <label class="check-item"><input type="checkbox" value="sem_etnia" class="chk-sec-etnia" onchange="aplicarFiltrosLocais()" checked> Sem Info</label>
+          </div>
+        </div>
+
+        <div id="sec-group-diagtrat" class="sec-filter-block">
+          <div class="sec-filter-header">
+            <label class="sec-filter-title">DIAG. E TRAT. ANTERIORES</label>
+            <div class="sec-filter-actions">
+              <span class="sec-filter-btn" onclick="marcarSecundario('diagtrat', true)">Todos</span>
+              <span class="sec-filter-btn" onclick="marcarSecundario('diagtrat', false)">Nenhum</span>
+            </div>
+          </div>
+          <div class="grid-checkboxes" style="grid-template-columns: 1fr;">
+            <label class="check-item"><input type="checkbox" value="1" class="chk-sec-diagtrat" onchange="aplicarFiltrosLocais()" checked> 1. Sem diag. e sem trat.</label>
+            <label class="check-item"><input type="checkbox" value="2" class="chk-sec-diagtrat" onchange="aplicarFiltrosLocais()" checked> 2. Com diag. e sem trat.</label>
+            <label class="check-item"><input type="checkbox" value="3" class="chk-sec-diagtrat" onchange="aplicarFiltrosLocais()" checked> 3. Com diag. e com trat.</label>
+            <label class="check-item"><input type="checkbox" value="outros" class="chk-sec-diagtrat" onchange="aplicarFiltrosLocais()" checked> 4. Outros / Sem info.</label>
+          </div>
+        </div>
+
+        <div id="sec-group-obito" class="sec-filter-block" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+          <div class="sec-filter-header">
+            <label class="sec-filter-title">DESFECHO CLÍNICO</label>
+            <div class="sec-filter-actions">
+              <span class="sec-filter-btn" onclick="marcarSecundario('obito', true)">Todos</span>
+              <span class="sec-filter-btn" onclick="marcarSecundario('obito', false)">Nenhum</span>
+            </div>
+          </div>
+          <div class="grid-checkboxes" style="grid-template-columns: 1fr 1fr;">
+            <label class="check-item"><input type="checkbox" value="VIVO" class="chk-sec-obito" onchange="aplicarFiltrosLocais()" checked> Vivos</label>
+            <label class="check-item"><input type="checkbox" value="OBITO" class="chk-sec-obito" onchange="aplicarFiltrosLocais()" checked> Óbitos</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group" style="padding: 10px; flex: 1; display: flex; flex-direction: column;">
+        <label class="control-label">4. Competências (Meses)</label>
+        <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+          <button class="btn-mini-filter" onclick="marcarMeses(true)">Todos</button>
+          <button class="btn-mini-filter" onclick="marcarMeses(false)">Nenhum</button>
+        </div>
+        <div id="container-meses" class="grid-checkboxes" style="grid-template-columns: 1fr 1fr; overflow-y: auto; flex: 1; align-content: flex-start;"></div>
+      </div>
+
+      <div class="control-group" style="padding: 10px;">
+        <label class="control-label"><i class="fa-solid fa-palette"></i> Aparência Visual</label>
+        <select onchange="trocarTema(this.value)" style="padding: 8px;">
+          <option value="dark">Escuro Executivo</option>
+          <option value="light">Claro Clean</option>
+          <option value="hcpa" selected>Institucional HCPA (Original)</option>
+          <option value="hcpa-site">Portal HCPA (Verde Oficial)</option>
+          <option value="aghuse">Sistema AGHUse (Cinza/Verde Limão)</option>
+          <option value="ocean">Azul Profundo (Ocean)</option>
+          <option value="emerald">Esmeralda</option>
+          <option value="sunset">Pôr do Sol (Bordeaux)</option>
+          <option value="slate">Cinza Corporativo (Slate)</option>
+          <option value="sage">Natureza Suave (Sage)</option>
+          <option value="neon">Noite Neon (Dark/Alto Contraste)</option>
+          <option value="sand">Luz Quente (Areia)</option>
+          <option value="navy">Azul Meia-Noite (Navy/Gold)</option>
+          <option value="rose">Frutas Vermelhas (Rose)</option>
+          <option value="terminal">Matriz/Hacker (Terminal)</option>
+          <option value="candy">Tons Pastel (Candy)</option>
+          <option value="graphite">Monocromático (Grafite)</option>
+        </select>
+        
+        <button class="btn-action btn-personalizar" onclick="abrirConfigWidgets()">
+          <i class="fa-solid fa-table-cells-large"></i> Personalizar Tela
+        </button>
+      </div>
+
+      <div class="control-group" style="padding: 10px; background: rgba(0,0,0,0.05);">
+        <label class="control-label"><i class="fa-solid fa-database"></i> Cache e Dados</label>
+        
+        <button class="btn-action btn-atualizar" onclick="buscarDadosDoServidor()">
+          <i class="fa-solid fa-rotate-right"></i> Atualizar Dados
+        </button>
+
+        <button class="btn-action" style="background: var(--accent); color: white; margin-top: 10px;" onclick="abrirPesquisaAvancada()">
+          <i class="fa-solid fa-magnifying-glass-plus"></i> Pesquisa Avançada
+        </button>
+
+        <!-- NOVO BOTÃO DE RELATÓRIO GERAL -->
+        <button class="btn-action" style="background: #ef4444; color: white; border: none; margin-top: 10px;" onclick="abrirModalRelatorioPDF()">
+          <i class="fa-solid fa-file-pdf"></i> Relatório PDF Completo
+        </button>
+        
+        <button class="btn-action btn-limpar" onclick="limparCachePersistente()">
+          <i class="fa-solid fa-trash-can"></i> Limpar Cache Local
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      
+      <div class="header">
+        <div style="display: flex; gap: 15px; align-items: center;">
+          <button class="toggle-view-btn" onclick="toggleSidebar()" style="font-size: 16px; padding: 6px 12px; height: 35px; color: var(--text-main); border-color: var(--border);"><i class="fa-solid fa-bars"></i></button>
+          <div>
+            <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1;">Observatório de Dados Clínicos - RHC</h1>
+            <span style="color: var(--text-muted); font-size: 11px;" id="status-periodo">Aguardando...</span>
+          </div>
+        </div>
+        <div style="text-align: center; padding: 0 15px; border-left: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Origem dos Dados</div>
+          <strong style="font-size: 14px; color: var(--accent);" id="header-periodo-rhc">Carregando...</strong>
+        </div>
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 20px;">
+          <div style="text-align: right;">
+            <strong style="font-size: 24px; color: var(--accent);" id="header-total-pacientes">0</strong>
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Casos Filtrados</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-grid" id="kpi-grid-container"></div>
+
+      <div class="charts-grid-top" id="container-graficos-superiores">
+  <!-- EVOLUÇÃO -->
+  <div class="chart-box" style="height: 350px;" id="box-evolucao">
+    <h3 class="chart-title">
+      <span><i class="fa-solid fa-chart-area"></i> Evolução da Série Histórica</span>
+      <div style="display:flex; gap:5px;">
+        <button class="toggle-view-btn" id="btn-val-abs" onclick="toggleLineView('valor')">Abs</button>
+        <button class="toggle-view-btn active" id="btn-val-pct" onclick="toggleLineView('porcentagem')">%</button>
+        <button class="toggle-view-btn" id="btn-val-bar" onclick="toggleLineView('barras')">Barras</button>
+      </div>
+    </h3>
+    
+    <div class="view-panel active" id="view-chart-evolucao">
+      <div style="flex:1; position: relative;"><canvas id="chartLinhas"></canvas></div>
+    </div>
+    
+    <div class="view-panel" id="view-table-evolucao" style="overflow-y: auto;">
+      <div id="table-container-evolucao"></div>
+    </div>
+
+    <!-- NOVO: Botão PDF -->
+    <button class="btn-export-pdf-card" onclick="gerarPDFIndividual('box-evolucao', 'Evolucao_Serie_Historica')" title="Baixar PDF">
+      <i class="fa-solid fa-download"></i>
+    </button>
+
+    <!-- Botão Tabela -->
+    <button class="btn-toggle-view-card" onclick="toggleCardView('evolucao')" title="Alternar Tabela/Gráfico">
+      <i class="fa-solid fa-table" id="icon-toggle-evolucao"></i>
+    </button>
+  </div>
+  
+  <!-- RADAR -->
+  <div class="chart-box" style="height: 350px; border-color: var(--accent);" id="box-radar">
+    <h3 class="chart-title">
+      <span><i class="fa-solid fa-satellite-dish"></i> Radar</span>
+      <span id="radar-mes-ativo" class="mes-destaque-radar">...</span>
+    </h3>
+    
+    <div class="view-panel active" id="view-chart-radar">
+      <div style="flex:1; position: relative;"><canvas id="chartRotativo"></canvas></div>
+      <div id="radar-dots" style="display: flex; justify-content: center; gap: 5px; margin-top: 10px; height: 8px;"></div>
+    </div>
+
+    <div class="view-panel" id="view-table-radar" style="overflow-y: auto;">
+      <div id="table-container-radar"></div>
+    </div>
+
+    <!-- NOVO: Botão PDF -->
+    <button class="btn-export-pdf-card" onclick="gerarPDFIndividual('box-radar', 'Radar_de_Proporcionalidade')" title="Baixar PDF">
+      <i class="fa-solid fa-download"></i>
+    </button>
+
+    <!-- Botão Tabela -->
+    <button class="btn-toggle-view-card" onclick="toggleCardView('radar')" title="Alternar Tabela/Gráfico">
+      <i class="fa-solid fa-table" id="icon-toggle-radar"></i>
+    </button>
+  </div>
+</div>
+
+      <div id="container-demograficos" class="grid-demograficos"></div>
+      <div id="container-clinicos" class="grid-clinicos"></div>
+      <div id="container-clinica-trat" class="grid-clinica-trat"></div>
+
+      <!-- CARD: PROPORCIONALIDADE (Ele tinha sumido daqui!) -->
+      <div class="chart-box" id="box-proporcionalidade" style="height: auto; margin-bottom: 30px;">
+        <h3 class="chart-title" style="margin-bottom: 20px;">
+          <span><i class="fa-solid fa-scale-balanced"></i> Análise de Proporcionalidade (<span id="lbl-perspectiva-titulo">Cores</span>)</span>
+          <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Amostra Demográfica: <strong id="lbl-total-global" style="color: var(--text-main);">0</strong> pacientes</span>
+        </h3>
+        <div id="container-proporcionalidade"></div>
+      </div>
+
+      <!-- CARD: DISTRIBUIÇÃO POR GRUPOS DE CID -->
+      <div class="chart-box" id="box-grupos-cid" style="height: auto; margin-bottom: 30px; position: relative;">
+        <h3 class="chart-title" style="margin-bottom: 20px; z-index: 2; position: relative;">
+          <span><i class="fa-solid fa-layer-group"></i> Distribuição por Grupos Topográficos de CID</span>
+        </h3>
+        
+        <div class="view-panel active" id="view-chart-grupocid_large">
+          <div style="height: 350px; position: relative;"><canvas id="chartGruposCids"></canvas></div>
+        </div>
+        
+        <div class="view-panel" id="view-table-grupocid_large" style="overflow-y: auto; max-height: 350px;">
+          <div id="table-container-grupocid_large"></div>
+        </div>
+
+        <!-- NOVO: Botão PDF -->
+        <button class="btn-export-pdf-card" onclick="gerarPDFIndividual('box-grupos-cid', 'Distribuicao_Grupos_CID')" title="Baixar PDF">
+          <i class="fa-solid fa-download"></i>
+        </button>
+
+        <!-- Botão Tabela -->
+        <button class="btn-toggle-view-card" onclick="toggleCardView('grupocid_large')" title="Alternar Tabela/Gráfico">
+          <i class="fa-solid fa-table" id="icon-toggle-grupocid_large"></i>
+        </button>
+      </div>
+
+      <!-- CARD: TOP CIDs -->
+      <div class="chart-box" id="box-top-cids" style="height: auto; margin-bottom: 30px; position: relative;">
+        <h3 class="chart-title" style="margin-bottom: 20px; z-index: 2; position: relative;">
+          <span><i class="fa-solid fa-virus"></i> Principais Diagnósticos (CIDs) da Base Filtrada</span>
+          <select id="seletor-top-cid" onchange="renderizarGraficoCids()" style="width: auto; padding: 4px 8px; font-size: 11px; border-radius: 4px; font-weight: normal; background: var(--bg-main); color: var(--text-main); border: 1px solid var(--border);">
+            <option value="10" selected>Top 10 CIDs</option>
+            <option value="20">Top 20 CIDs</option>
+            <option value="30">Top 30 CIDs</option>
+          </select>
+        </h3>
+        
+        <div class="view-panel active" id="view-chart-topcid">
+          <div style="height: 400px; position: relative;"><canvas id="chartTopCids"></canvas></div>
+        </div>
+        
+        <div class="view-panel" id="view-table-topcid" style="overflow-y: auto; max-height: 400px;">
+          <div id="table-container-topcid"></div>
+        </div>
+
+        <!-- NOVO: Botão PDF -->
+        <button class="btn-export-pdf-card" onclick="gerarPDFIndividual('box-top-cids', 'Principais_Diagnosticos_CIDs')" title="Baixar PDF">
+          <i class="fa-solid fa-download"></i>
+        </button>
+
+        <!-- Botão Tabela -->
+        <button class="btn-toggle-view-card" onclick="toggleCardView('topcid')" title="Alternar Tabela/Gráfico">
+          <i class="fa-solid fa-table" id="icon-toggle-topcid"></i>
+        </button>
+      </div>
+
+    </main>
+  </div>
+
+  <div id="modal-widgets" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+    <div style="background:var(--bg-card); width: 750px; max-width: 95vw; max-height: 90vh; overflow-y: auto; border-radius: 12px; padding: 30px; border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0,0,0,0.4); display: flex; flex-direction: column;">
+      
+      <h3 style="margin-top:0; margin-bottom: 5px; font-size: 20px; color:var(--text-main);">
+        <i class="fa-solid fa-map-location-dot" style="color: var(--accent);"></i> Mapa do Dashboard
+      </h3>
+      
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+        <p style="font-size:12px; color:var(--text-muted); margin: 0;">
+          Clique nos blocos para ativar ou ocultar as sessões na tela principal.
+        </p>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="alternarTodosWidgets(true)" style="padding: 6px 12px; font-size: 11px; border-radius: 6px; border: 1px solid var(--secondary); background: rgba(59, 130, 246, 0.1); color: var(--secondary); cursor: pointer; font-weight: 700; transition: 0.2s;">
+            <i class="fa-solid fa-check-double"></i> Mostrar Todos
+          </button>
+          <button onclick="alternarTodosWidgets(false)" style="padding: 6px 12px; font-size: 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-main); color: var(--text-muted); cursor: pointer; font-weight: 700; transition: 0.2s;">
+            <i class="fa-solid fa-ban"></i> Ocultar Todos
+          </button>
+        </div>
+      </div>
+      
+      <div id="lista-widgets" style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; border: 1px dashed var(--border); display: flex; flex-direction: column;">
+      </div>
+      
+      <div style="display:flex; justify-content:flex-end; gap:12px; padding-top: 20px; margin-top: 10px;">
+        <button onclick="fecharConfigWidgets()" style="padding:10px 20px; font-size: 13px; border-radius:6px; border:1px solid var(--border); background:var(--bg-main); color:var(--text-main); font-weight:600; cursor:pointer; transition: 0.2s;">Cancelar</button>
+        <button onclick="salvarConfigWidgets()" style="padding:10px 20px; font-size: 13px; border-radius:6px; border:none; background:var(--accent); color:#fff; font-weight:bold; cursor:pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(56, 189, 248, 0.3);">Aplicar ao Dashboard</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE EXPORTAÇÃO DE RELATÓRIO PDF -->
+  <div id="modal-export-pdf" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+    <div style="background:var(--bg-card); width: 600px; max-width: 95vw; border-radius: 12px; padding: 30px; border: 1px solid var(--border);">
+      <h3 style="margin-top:0; color:var(--text-main);"><i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> Configurar Relatório</h3>
+      <p style="font-size:12px; color:var(--text-muted);">Escolha os módulos para o preview:</p>
+      <div id="lista-opcoes-pdf" style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; display:grid; grid-template-columns:1fr 1fr; gap:10px; max-height:300px; overflow-y:auto;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top: 20px;">
+        <button onclick="fecharModalPDF()" style="padding:10px 20px; background:var(--bg-main); color:var(--text-main); border-radius:6px; cursor:pointer; border:1px solid var(--border);">Cancelar</button>
+        <button onclick="gerarPreviewPDF()" style="padding:10px 20px; background:#ef4444; color:#fff; font-weight:bold; border-radius:6px; border:none; cursor:pointer;">Visualizar Relatório</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-pdf-preview" class="modal-preview-pdf">
+    <div style="max-width: 1100px; margin: 0 auto;">
+      <div style="background: #1e293b; padding: 15px 25px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10002; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);">
+        <div style="color: white;">
+           <strong style="display:block; font-size: 14px;">Preview do Relatório</strong>
+           <span style="font-size: 11px; opacity: 0.7;">Confira os dados antes de exportar</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button onclick="fecharPreview()" style="padding: 8px 15px; background: #475569; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;"><i class="fa-solid fa-xmark"></i> Fechar</button>
+          <button onclick="imprimirRelatorio()" style="padding: 8px 15px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;"><i class="fa-solid fa-print"></i> Imprimir</button>
+          <button onclick="salvarComoPDF()" style="padding: 8px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 800; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);"><i class="fa-solid fa-file-export"></i> Salvar PDF</button>
+        </div>
+      </div>
+      
+      <div id="pdf-preview-content">
+        </div>
+    </div>
+  </div>
+
+  <div id="modal-pesquisa-avancada">
+  
+  <div class="pesquisa-header">
+    <div style="color: white; display: flex; align-items: center; gap: 15px;">
+      <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px;">
+        <i class="fa-solid fa-user-secret" style="font-size: 20px; color: #38bdf8;"></i>
+      </div>
+      <div>
+        <h2 style="margin:0; font-size: 18px; font-weight: 800;">Pesquisa Avançada Anonimizada</h2>
+        <span id="pesquisa-status-text" style="font-size: 11px; color: #94a3b8;">Construção de relatórios e extração segura.</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn-pesquisa-top" style="background: #10b981; color: white;" onclick="exportarPesquisaCSV()"><i class="fa-solid fa-file-excel"></i> Exportar CSV</button>
+      <button class="btn-pesquisa-top" style="background: #ef4444; color: white;" onclick="fecharPesquisaAvancada()"><i class="fa-solid fa-xmark"></i> Sair da Pesquisa</button>
+    </div>
+  </div>
+
+  <div class="pesquisa-body">
+    <div class="pesquisa-sidebar">
+      <div class="pesquisa-sidebar-title">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span><i class="fa-solid fa-filter"></i> Construtor</span>
+          <span style="font-size:9px; color:var(--accent); cursor:pointer;" onclick="estadoInicialPesquisa()">[Limpar Tudo]</span>
+        </div>
+      </div>
+      <div class="pesquisa-sidebar-filtros" id="container-sidebar-grupos">
+         </div>
+    </div>
+
+    <div class="pesquisa-main">
+      <div class="pesquisa-top-dashboard">
+        
+        <div class="pesquisa-card-total">
+          <span class="val" id="stat-casos">0</span>
+          <span class="lbl">Casos Filtrados</span>
+        </div>
+        
+        <div class="pesquisa-card-resumo">
+          <span class="pesquisa-card-titulo">Critérios Ativos</span>
+          <div class="pesquisa-card-desc" id="stat-desc-filtros">Aguardando seleções na barra lateral.</div>
+        </div>
+        
+        <div class="pesquisa-card-distribuicao" id="card-distribuicao-print">
+          <div class="dist-header-actions">
+             <span class="pesquisa-card-titulo">Distribuição no Tempo</span>
+             <div style="display:flex; gap:5px;" class="hide-on-pdf">
+                <button class="dist-btn" onclick="toggleDistView()"><i class="fa-solid fa-table"></i> Alternar Visão</button>
+                <button class="dist-btn" onclick="exportarDistribuicaoPDF()"><i class="fa-solid fa-file-pdf" style="color:#ef4444;"></i> Relatório PDF</button>
+             </div>
+          </div>
+          
+          <div id="view-dist-badges">
+             <div class="dist-label-row" id="lbl-anos" style="display:none;">Por Anos:</div>
+             <div class="distribuicao-row" id="dist-anos"></div>
+             <div class="dist-label-row" id="lbl-meses" style="display:none;">Por Meses:</div>
+             <div class="distribuicao-row" id="dist-meses"></div>
+          </div>
+
+          <div class="view-dist-tables-container" id="view-dist-table">
+             <div id="container-tabela-anos"></div>
+             <div id="container-tabela-meses"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pesquisa-results-container">
+        <table id="tabela-avancada-indep">
+          <thead id="head-indep"></thead>
+          <tbody id="body-indep">
+             <tr><td style="text-align:center; padding:100px; font-size: 14px; color: #94a3b8;">Inicializando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pdf-mineracao-container"></div>
+
+  <script>
+    // =========================================================================
+    // 1. VARIÁVEIS GLOBAIS E ESTADOS DO SISTEMA
+    // =========================================================================
+    let rawData = [];
+    let CACHE_ANOS_PROCESSADOS = {}; 
+    let dadosAtivosNoFiltro = []; 
+    let charts = {};
+    let carrosselTimer = null;
+    let totalGeralAno = 0; 
+    let modoEvolucao = 'porcentagem';
+    let modeloCalendarioAtual = 'RHC';
+    let perspectivaAtual = 'cores';
+
+    // Variável Mestra de Estrutura do Dashboard (Define o padrão se for o 1º acesso)
+    let widgetsAtivos = JSON.parse(localStorage.getItem('rhc_widgets_ativos')) || [
+      'evolucao', 
+      'idade', 'sexo', 'etnia', 'diagtrat', 'obito', 
+      'proporcionalidade'
+    ];
+
+    const CHAVES_DEMOGRAFICAS = ['cores', 'idade', 'sexo', 'etnia', 'diagtrat', 'obito'];
+    const CHAVES_CLINICAS = ['primTrat', 'estadoDoenca', 'razaoNaoTrat', 'baseDiag'];
+    const CHAVES_CLINICA_FULL = ['clinicaTrat'];
+
+    // =========================================================================
+    // 2. CONFIGURAÇÕES BASE (PERSPECTIVAS E CATEGORIAS)
+    // =========================================================================
+    const CONFIG_PERSPECTIVAS = {
+      cores: {
+        titulo: "Cores (Lei 60)", chave: "cat_cores",
+        categorias: [
+          { id: 'verde', nome: 'No Prazo (<= 60)', hexRef: 'var(--verde)' },
+          { id: 'vermelho', nome: 'Fora do Prazo (> 60)', hexRef: 'var(--vermelho)' },
+          { id: 'ciano', nome: 'Sem Conduta Fechada', hexRef: 'var(--ciano)' },
+          { id: 'amarelo', nome: 'Baixo Risco', hexRef: 'var(--amarelo)' },
+          { id: 'laranja', nome: 'Excluídos (Geral)', hexRef: 'var(--laranja)' },
+          { id: 'magenta', nome: 'Revisão/Futuros', hexRef: 'var(--magenta)' },
+          { id: 'branco', nome: 'Em Branco / Sem Cor', hexRef: 'var(--branco)' }
+        ]
+      },
+      grupocid: {
+        titulo: "Grupos de CID (Macro)", chave: "cat_grupocid",
+        categorias: [
+          { id: 'C00-C14', nome: 'C00-C14 - Lábio, Cav. Oral e Faringe', hexRef: '#ef4444' },
+          { id: 'C15-C26', nome: 'C15-C26 - Órgãos Digestivos', hexRef: '#f97316' },
+          { id: 'C30-C39', nome: 'C30-C39 - Aparelho Respiratório', hexRef: '#0ea5e9' },
+          { id: 'C40-C41', nome: 'C40-C41 - Ossos e Cartilagens', hexRef: '#8b5cf6' },
+          { id: 'C43-C44', nome: 'C43-C44 - Pele', hexRef: '#eab308' },
+          { id: 'C45-C49', nome: 'C45-C49 - Tec. Mesotelial/Moles', hexRef: '#d946ef' },
+          { id: 'C50',     nome: 'C50 - Mama', hexRef: '#ec4899' },
+          { id: 'C51-C58', nome: 'C51-C58 - Genitais Femininos', hexRef: '#f43f5e' },
+          { id: 'C60-C63', nome: 'C60-C63 - Genitais Masculinos', hexRef: '#3b82f6' },
+          { id: 'C64-C68', nome: 'C64-C68 - Trato Urinário', hexRef: '#14b8a6' },
+          { id: 'C69-C72', nome: 'C69-C72 - SNC e Olhos', hexRef: '#64748b' },
+          { id: 'C73-C75', nome: 'C73-C75 - Glând. Endócrinas', hexRef: '#10b981' },
+          { id: 'C76-C80', nome: 'C76-C80 - Mal Definidas/Secund.', hexRef: '#334155' },
+          { id: 'OUTROS',  nome: 'Outros / Sem Info', hexRef: '#94a3b8' }
+        ]
+      },
+      grupocid_detalhado: {
+        titulo: "Grupos de CID (Detalhado)", chave: "cat_grupocid_detalhado",
+        categorias: [
+          { id: 'C00-C14', nome: 'Lábio, Cav. Oral e Faringe', hexRef: '#ef4444' },
+          { id: 'C15', nome: 'Esôfago', hexRef: '#f87171' },
+          { id: 'C16', nome: 'Estômago', hexRef: '#b91c1c' },
+          { id: 'C18', nome: 'Cólon', hexRef: '#f97316' },
+          { id: 'C19-C21', nome: 'Reto, Ânus e Canal Anal', hexRef: '#fb923c' },
+          { id: 'C22', nome: 'Fígado e Vias Biliares', hexRef: '#fbbf24' },
+          { id: 'C25', nome: 'Pâncreas', hexRef: '#eab308' },
+          { id: 'C17_23_24_26', nome: 'Outros Órgãos Digestivos', hexRef: '#84cc16' },
+          { id: 'C32', nome: 'Laringe', hexRef: '#10b981' },
+          { id: 'C33-C34', nome: 'Traquéia, Brônquios e Pulmão', hexRef: '#06b6d4' },
+          { id: 'C30_31_37_39', nome: 'Outros Órgãos Respiratórios', hexRef: '#38bdf8' },
+          { id: 'C40-C41', nome: 'Osso e Cartilagem', hexRef: '#3b82f6' },
+          { id: 'C43', nome: 'Pele (Melanoma)', hexRef: '#6366f1' },
+          { id: 'C44', nome: 'Pele (Outros)', hexRef: '#818cf8' },
+          { id: 'C45-C49', nome: 'Tecido Mesotelial e Moles', hexRef: '#8b5cf6' },
+          { id: 'C50', nome: 'Mama', hexRef: '#ec4899' },
+          { id: 'C53', nome: 'Colo do Útero', hexRef: '#be185d' },
+          { id: 'C54-C55', nome: 'Corpo do Útero', hexRef: '#9f1239' },
+          { id: 'C51_52_56_58', nome: 'Outros Genitais Femininos', hexRef: '#fda4af' },
+          { id: 'C61', nome: 'Próstata', hexRef: '#1e3a8a' },
+          { id: 'C60_62_63', nome: 'Outros Genitais Masculinos', hexRef: '#1d4ed8' },
+          { id: 'C67', nome: 'Bexiga', hexRef: '#0369a1' },
+          { id: 'C64_66_68', nome: 'Outros Trato Urinário', hexRef: '#0e7490' },
+          { id: 'C69', nome: 'Olhos e Anexos', hexRef: '#155e75' },
+          { id: 'C71', nome: 'Encéfalo', hexRef: '#4c1d95' },
+          { id: 'C70_72', nome: 'Outras Partes do SNC', hexRef: '#5b21b6' },
+          { id: 'C73-C80_C97', nome: 'Localiz. Mal Definida/Secund.', hexRef: '#475569' },
+          { id: 'C81', nome: 'Doença de Hodgkin', hexRef: '#a21caf' },
+          { id: 'C82-C85', nome: 'Linfoma não-Hodgkin', hexRef: '#c026d3' },
+          { id: 'C91-C95', nome: 'Leucemia', hexRef: '#701a75' },
+          { id: 'C88_90_96', nome: 'Tecidos Linfóide/Hemat.', hexRef: '#4a044e' },
+          { id: 'OUTROS', nome: 'Outros / Não Especific.', hexRef: '#94a3b8' }
+        ]
+      },
+      especifico: {
+        titulo: "Personalizado", chave: "cid",
+        categorias: []
+      },
+      idade: {
+        titulo: "Faixa Etária", chave: "cat_idade",
+        categorias: [
+          { id: '0-17', nome: 'Menor que 18', hexRef: '#38bdf8' },
+          { id: '18-39', nome: '18 a 39 anos', hexRef: '#8b5cf6' },
+          { id: '40-59', nome: '40 a 59 anos', hexRef: '#f59e0b' },
+          { id: '60+', nome: '60 anos ou mais', hexRef: '#10b981' },
+          { id: 'sem_idade', nome: 'Sem Informação', hexRef: '#94a3b8' }
+        ]
+      },
+      sexo: {
+        titulo: "Sexo", chave: "cat_sexo",
+        categorias: [
+          { id: 'F', nome: 'Feminino', hexRef: '#ec4899' },
+          { id: 'M', nome: 'Masculino', hexRef: '#3b82f6' },
+          { id: 'sem_sexo', nome: 'Sem Informação', hexRef: '#94a3b8' }
+        ]
+      },
+      etnia: {
+        titulo: "Etnia", chave: "cat_etnia",
+        categorias: [
+          { id: 'BRANCA', nome: 'Branca', hexRef: '#e2e8f0' },
+          { id: 'PRETA', nome: 'Preta', hexRef: '#1e293b' },
+          { id: 'PARDA', nome: 'Parda', hexRef: '#8b5cf6' },
+          { id: 'AMARELA', nome: 'Amarela', hexRef: '#f59e0b' },
+          { id: 'INDIGENA', nome: 'Indígena', hexRef: '#10b981' },
+          { id: 'sem_etnia', nome: 'Sem Informação', hexRef: '#94a3b8' }
+        ]
+      },
+      diagtrat: {
+        titulo: "Diag. e Trat.", chave: "cat_diagtrat",
+        categorias: [
+          { id: '1', nome: '1. Sem diag/sem trat', hexRef: '#3b82f6' },
+          { id: '2', nome: '2. Com diag/sem trat', hexRef: '#f59e0b' },
+          { id: '3', nome: '3. Com diag/com trat', hexRef: '#10b981' },
+          { id: 'outros', nome: '4. Outros / Sem info', hexRef: '#e74c3c' }
+        ]
+      },
+      obito: {
+        titulo: "Desfecho", chave: "cat_obito",
+        categorias: [
+          { id: 'VIVO', nome: 'Vivos', hexRef: '#10b981' },
+          { id: 'OBITO', nome: 'Óbitos', hexRef: '#1e293b' }
+        ]
+      },
+      primTrat: {
+        titulo: "1º Tratamento no Hospital", chave: "cat_primTrat",
+        categorias: [
+          { id: 'NENHUM', nome: 'Nenhum', hexRef: '#94a3b8' },
+          { id: 'CIRURGIA', nome: 'Cirurgia', hexRef: '#ef4444' },
+          { id: 'RADIOTERAPIA', nome: 'Radioterapia', hexRef: '#eab308' },
+          { id: 'QUIMIOTERAPIA', nome: 'Quimioterapia', hexRef: '#3b82f6' },
+          { id: 'HORMONIOTERAPIA', nome: 'Hormonioterapia', hexRef: '#d946ef' },
+          { id: 'TMO', nome: 'TMO', hexRef: '#10b981' },
+          { id: 'IMUNOTERAPIA', nome: 'Imunoterapia', hexRef: '#06b6d4' },
+          { id: 'OUTRAS', nome: 'Outras', hexRef: '#f97316' },
+          { id: 'SEM_INFO', nome: 'Sem Informação', hexRef: '#cbd5e1' }
+        ]
+      },
+      estadoDoenca: {
+        titulo: "Estado da Doença (Fim 1º Trat)", chave: "cat_estadoDoenca",
+        categorias: [
+          { id: 'REM_COMPLETA', nome: 'Sem evidência (Remissão Compl.)', hexRef: '#10b981' },
+          { id: 'REM_PARCIAL', nome: 'Remissão Parcial', hexRef: '#34d399' },
+          { id: 'ESTAVEL', nome: 'Doença Estável', hexRef: '#38bdf8' },
+          { id: 'PROGRESSAO', nome: 'Doença em Progressão', hexRef: '#ef4444' },
+          { id: 'PALIATIVOS', nome: 'Cuidados Paliativos', hexRef: '#f59e0b' },
+          { id: 'OBITO', nome: 'Óbito', hexRef: '#1e293b' },
+          { id: 'NAO_APLICA', nome: 'Não se aplica', hexRef: '#64748b' },
+          { id: 'SEM_INFO', nome: 'Sem Informação', hexRef: '#cbd5e1' }
+        ]
+      },
+      razaoNaoTrat: {
+        titulo: "Razão Não Realização (1º Trat)", chave: "cat_razaoNaoTrat",
+        categorias: [
+          { id: 'RECUSA', nome: 'Recusa do tratamento', hexRef: '#ef4444' },
+          { id: 'FORA', nome: 'Tratamento realizado fora', hexRef: '#3b82f6' },
+          { id: 'AVANCADA_CLINICA', nome: 'Doença avançada/Falta de condições', hexRef: '#f97316' },
+          { id: 'ABANDONO', nome: 'Abandono do tratamento', hexRef: '#eab308' },
+          { id: 'COMPLICACOES', nome: 'Complicações de tratamento', hexRef: '#d946ef' },
+          { id: 'OBITO', nome: 'Óbito', hexRef: '#1e293b' },
+          { id: 'OUTRAS', nome: 'Outras razões', hexRef: '#64748b' },
+          { id: 'NAO_APLICA', nome: 'Não se aplica', hexRef: '#94a3b8' },
+          { id: 'SEM_INFO', nome: 'Sem Informação', hexRef: '#cbd5e1' }
+        ]
+      },
+      baseDiag: {
+        titulo: "Base Mais Importante do Diag.", chave: "cat_baseDiag",
+        categorias: [
+          { id: 'CLINICA', nome: 'Clínica', hexRef: '#3b82f6' },
+          { id: 'PESQUISA', nome: 'Pesquisa Clínica', hexRef: '#8b5cf6' },
+          { id: 'IMAGEM', nome: 'Exame de imagem', hexRef: '#0ea5e9' },
+          { id: 'MARCADORES', nome: 'Marcadores tumorais', hexRef: '#f59e0b' },
+          { id: 'CITOLOGIA', nome: 'Citologia', hexRef: '#ec4899' },
+          { id: 'HISTO_META', nome: 'Histologia de Metástase', hexRef: '#ef4444' },
+          { id: 'HISTO_PRIM', nome: 'Histologia de tumor primário', hexRef: '#10b981' },
+          { id: 'SEM_INFO', nome: 'Sem Informação', hexRef: '#cbd5e1' }
+        ]
+      },
+      clinicaTrat: {
+        titulo: "Clínica (Início do Tratamento)", chave: "cat_clinicaTrat",
+        categorias: [
+          { id: 'ALERGIA_IMUNO', nome: 'Alergia/Imunologia', hexRef: '#ef4444' },
+          { id: 'CIR_CARDIACA', nome: 'Cirurgia Cardíaca', hexRef: '#dc2626' },
+          { id: 'CABECA_PESCOCO', nome: 'Cabeça e Pescoço', hexRef: '#f97316' },
+          { id: 'CIR_GERAL', nome: 'Cirurgia Geral', hexRef: '#f59e0b' },
+          { id: 'PED_CIR', nome: 'Pediatria Cirúrgica', hexRef: '#eab308' },
+          { id: 'CIR_PLASTICA', nome: 'Cirurgia Plástica', hexRef: '#84cc16' },
+          { id: 'CIR_TORACICA', nome: 'Cirurgia Torácica', hexRef: '#22c55e' },
+          { id: 'CIR_VASCULAR', nome: 'Cirurgia Vascular', hexRef: '#10b981' },
+          { id: 'CLIN_MEDICA', nome: 'Clínica Médica', hexRef: '#14b8a6' },
+          { id: 'DERMATO', nome: 'Dermatologia', hexRef: '#06b6d4' },
+          { id: 'ENDOCRINO', nome: 'Endocrinologia', hexRef: '#0ea5e9' },
+          { id: 'GASTRO_CIR', nome: 'Gastrocirurgia', hexRef: '#3b82f6' },
+          { id: 'GASTRO_CLIN', nome: 'Gastroenterologia', hexRef: '#6366f1' },
+          { id: 'GERIATRIA', nome: 'Geriatria', hexRef: '#8b5cf6' },
+          { id: 'GINECO', nome: 'Ginecologia', hexRef: '#a855f7' },
+          { id: 'GINECO_OBS', nome: 'Ginecologia/Obstetrícia', hexRef: '#d946ef' },
+          { id: 'HEMATO_CLIN', nome: 'Hematologia Clínica', hexRef: '#ec4899' },
+          { id: 'INFECTO', nome: 'Infectologia', hexRef: '#f43f5e' },
+          { id: 'NEFRO', nome: 'Nefrologia', hexRef: '#9f1239' },
+          { id: 'NEUROCIR', nome: 'Neurocirurgia', hexRef: '#7c2d12' },
+          { id: 'NEUROLOGIA', nome: 'Neurologia', hexRef: '#431407' },
+          { id: 'OFTALMO', nome: 'Oftalmologia', hexRef: '#0284c7' },
+          { id: 'ONCO_CIR', nome: 'Oncologia Cirúrgica', hexRef: '#b91c1c' },
+          { id: 'ONCO_CLIN', nome: 'Oncologia Clínica', hexRef: '#c2410c' },
+          { id: 'PED_ONCO', nome: 'Pediatria Oncológica', hexRef: '#b45309' },
+          { id: 'ORTO', nome: 'Ortopedia', hexRef: '#4d7c0f' },
+          { id: 'OTORRINO', nome: 'Otorrinolaringologia', hexRef: '#15803d' },
+          { id: 'PEDIATRIA', nome: 'Pediatria', hexRef: '#047857' },
+          { id: 'PNEUMO', nome: 'Pneumologia', hexRef: '#0f766e' },
+          { id: 'PROCTO', nome: 'Proctologia', hexRef: '#0369a1' },
+          { id: 'RADIO', nome: 'Radioterapia', hexRef: '#1d4ed8' },
+          { id: 'UROLOGIA', nome: 'Urologia', hexRef: '#4338ca' },
+          { id: 'MASTO', nome: 'Mastologia', hexRef: '#6d28d9' },
+          { id: 'ONCO_CUTANEA', nome: 'Oncologia Cutânea', hexRef: '#7e22ce' },
+          { id: 'CIR_PELVICA', nome: 'Cirurgia Pélvica', hexRef: '#a21caf' },
+          { id: 'CIR_ABDOMINAL', nome: 'Cirurgia Abdominal', hexRef: '#be185d' },
+          { id: 'ODONTO', nome: 'Odontologia', hexRef: '#475569' },
+          { id: 'CEMO', nome: 'Cemo', hexRef: '#334155' },
+          { id: 'ENDOSCOPIA', nome: 'Endoscopia', hexRef: '#1e293b' },
+          { id: 'ESTOMATO', nome: 'Estomato - Odontologia', hexRef: '#0f172a' },
+          { id: 'PLAST_REPARADORA', nome: 'Plástica Reparadora', hexRef: '#f87171' },
+          { id: 'TEC_OSSEO', nome: 'Tecido Ósseo e Conectivo', hexRef: '#fb923c' },
+          { id: 'HEMOTERAPIA', nome: 'Hemoterapia', hexRef: '#fbbf24' },
+          { id: 'MED_NUCLEAR', nome: 'Medicina Nuclear', hexRef: '#a3e635' },
+          { id: 'PSIQUIATRIA', nome: 'Psiquiatria', hexRef: '#34d399' },
+          { id: 'TRIAGEM', nome: 'Triagem', hexRef: '#2dd4bf' },
+          { id: 'CLIN_DOR', nome: 'Clínica da Dor', hexRef: '#38bdf8' },
+          { id: 'SUPORTE_ONCO', nome: 'Suporte Terapêutico Oncológico', hexRef: '#818cf8' },
+          { id: 'ABDOMEN_PELVICA', nome: 'Abdômen Pélvica', hexRef: '#c084fc' },
+          { id: 'NAO_APLICA', nome: 'Não se Aplica', hexRef: '#94a3b8' },
+          { id: 'SEM_INFO', nome: 'Sem Informação', hexRef: '#cbd5e1' }
+        ]
+      }
+    };
+
+    // =========================================================================
+    // 3. FUNÇÕES UTILITÁRIAS E DE APOIO
+    // =========================================================================
+    window.onload = function() {
+      trocarTema('hcpa');
+      Chart.register(ChartDataLabels);
+      mudarPerspectiva('cores');
+      popularDropdownAnosRHC(); 
+      buscarDadosDoServidor();
+    };
+
+    function ordemAnoRHC(a, b) {
+      if (!a || !b) return 0;
+      const meses = { "OUT":1, "NOV":2, "DEZ":3, "JAN":4, "FEV":5, "MAR":6, "ABR":7, "MAI":8, "JUN":9, "JUL":10, "AGO":11, "SET":12 };
+      const partesA = String(a).split('/'); 
+      const partesB = String(b).split('/');
+      const valA = (parseInt(partesA[1] || 0)*100) + (meses[partesA[0] ? partesA[0].toUpperCase() : ""] || 0);
+      const valB = (parseInt(partesB[1] || 0)*100) + (meses[partesB[0] ? partesB[0].toUpperCase() : ""] || 0);
+      return valA - valB;
+    }
+
+    function obterAnoAgrupamento(mesAnoStr) {
+      if (!mesAnoStr) return "S/D";
+      let parts = mesAnoStr.split('/');
+      let mes = parts[0].toUpperCase();
+      let ano = parseInt(parts[1]);
+      
+      if (modeloCalendarioAtual === 'RHC') {
+          const mesesRHC_anoSeguinte = ['OUT', 'NOV', 'DEZ'];
+          if (mesesRHC_anoSeguinte.includes(mes)) return (ano + 1).toString();
+          return ano.toString();
+      }
+      return ano.toString();
+    }
+
+    function obterCorReal(hexRef) {
+      const style = getComputedStyle(document.body);
+      if(hexRef.startsWith('var(')) {
+        return style.getPropertyValue(hexRef.replace('var(','').replace(')','')).trim();
+      }
+      return hexRef;
+    }
+
+    function animarValor(id, final) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      let init = 0, inc = final / 20;
+      if (inc === 0) { el.innerText = final; return; }
+      let timer = setInterval(() => {
+        init += inc;
+        if (init >= final) { el.innerText = final; clearInterval(timer); }
+        else el.innerText = Math.floor(init);
+      }, 20);
+    }
+
+    function gerarBlocoProp(titulo1, subtitulo1, lista1, total1, titulo2, subtitulo2, lista2, total2, icon1 = 'fa-users', icon2 = 'fa-filter') {
+        let html = `<div class="prop-card-container">`;
+        html += `<div class="prop-panel">
+            <div class="prop-panel-title"><i class="fa-solid ${icon1}"></i> ${titulo1}</div>
+            <div class="prop-panel-sub">${subtitulo1}</div>`;
+        lista1.forEach(item => {
+            let pct = total1 > 0 ? ((item.qtd / total1) * 100).toFixed(1) : 0;
+            html += `
+            <div class="prop-item">
+                <div class="prop-item-header">
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:14px; height:14px; background:${item.cor}; border-radius:3px;"></div>
+                        ${item.nome}
+                    </span>
+                    <span>${item.qtd} pac. <strong style="margin-left: 5px;">(${pct}%)</strong></span>
+                </div>
+                <div class="prop-item-bar-bg">
+                    <div class="prop-item-bar-fill" style="width:${pct}%; background:${item.cor};"></div>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+        html += `<div class="prop-panel" style="border-color: rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.02);">
+            <div class="prop-panel-title"><i class="fa-solid ${icon2}" style="color:var(--accent);"></i> <span style="color:var(--accent);">${titulo2}</span></div>
+            <div class="prop-panel-sub">${subtitulo2}</div>`;
+        lista2.forEach(item => {
+            let pct = total2 > 0 ? ((item.qtd / total2) * 100).toFixed(1) : 0;
+            html += `
+            <div class="prop-item">
+                <div class="prop-item-header">
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:14px; height:14px; background:${item.cor}; border-radius:3px;"></div>
+                        ${item.nome}
+                    </span>
+                    <span>${item.qtd} pac. <strong style="margin-left: 5px;">(${pct}%)</strong></span>
+                </div>
+                <div class="prop-item-bar-bg">
+                    <div class="prop-item-bar-fill" style="width:${pct}%; background:${item.cor};"></div>
+                </div>
+            </div>`;
+        });
+        html += `</div></div>`;
+        return html;
+    }
+
+    function classificarGrupoCID(cidBruto) {
+      if (!cidBruto) return 'OUTROS';
+      let match = cidBruto.match(/[C](\d{2})/i); 
+      if (!match) return 'OUTROS';
+      let num = parseInt(match[1], 10);
+
+      if (num >= 0 && num <= 14) return 'C00-C14';
+      if (num >= 15 && num <= 26) return 'C15-C26';
+      if (num >= 30 && num <= 39) return 'C30-C39';
+      if (num >= 40 && num <= 41) return 'C40-C41';
+      if (num >= 43 && num <= 44) return 'C43-C44';
+      if (num >= 45 && num <= 49) return 'C45-C49';
+      if (num === 50) return 'C50';
+      if (num >= 51 && num <= 58) return 'C51-C58';
+      if (num >= 60 && num <= 63) return 'C60-C63';
+      if (num >= 64 && num <= 68) return 'C64-C68';
+      if (num >= 69 && num <= 72) return 'C69-C72';
+      if (num >= 73 && num <= 75) return 'C73-C75';
+      if (num >= 76 && num <= 80) return 'C76-C80';
+      return 'OUTROS';
+    }
+
+    // =========================================================================
+    // 4. INTERAÇÕES E CONTROLES DA INTERFACE
+    // =========================================================================
+    function trocarTema(tema) { 
+      document.body.setAttribute('data-theme', tema); 
+      Chart.defaults.color = getComputedStyle(document.body).getPropertyValue('--text-muted').trim();
+      if (rawData.length > 0) aplicarFiltrosLocais(); 
+    }
+
+    function mudarModeloCalendario() {
+      modeloCalendarioAtual = document.getElementById('select-modelo-calendario').value;
+      
+      // Atualiza os textos dos anos e dispara a busca. 
+      // O motor agora é inteligente e vai buscar a "gaveta" certa na memória.
+      popularDropdownAnosRHC(); 
+      buscarDadosDoServidor(); 
+    }
+
+    function popularDropdownAnosRHC() {
+      const select = document.getElementById('select-ano-rhc');
+      const valAnterior = select.value; 
+      select.innerHTML = ''; 
+
+      const hoje = new Date();
+      const anoAtual = hoje.getFullYear();
+      const mesAtual = hoje.getMonth() + 1; 
+
+      let anoMaximo = (mesAtual >= 10 && modeloCalendarioAtual === 'RHC') ? anoAtual + 1 : anoAtual;
+      let anoMinimo = 2021; 
+
+      for (let ano = anoMaximo; ano >= anoMinimo; ano--) {
+        let texto = modeloCalendarioAtual === 'RHC' 
+                    ? `Out/${ano - 1} a Set/${ano} (RHC)` 
+                    : `Jan/${ano} a Dez/${ano} (Civil)`;
+        select.add(new Option(texto, ano));
+      }
+      
+      select.add(new Option("⭐ Comparação Anual (Global)", "GLOBAL"));
+      if (Array.from(select.options).some(opt => opt.value === valAnterior)) {
+        select.value = valAnterior;
+      }
+    }
+
+    function mudarPerspectiva(nova) {
+      perspectivaAtual = nova;
+      
+      // Controla a exibição do sub-menu de CIDs
+      const subMenu = document.getElementById('sub-menu-cid');
+      if (nova === 'grupocid') {
+          subMenu.style.display = 'block';
+          mudarSubPerspectivaCid(); // Verifica se é padrão, detalhado ou específico
+          return; // Interrompe aqui, pois a função acima já vai desenhar a tela
+      } else {
+          subMenu.style.display = 'none';
+      }
+      
+      // Busca as configurações da perspectiva atual
+      const config = CONFIG_PERSPECTIVAS[nova];
+      
+      // Manda a configuração para a nova função desenhadora
+      renderizarInterfaceDePerspectiva(config);
+      
+      // Atualiza os dados se a base já estiver carregada
+      if (rawData && rawData.length > 0) aplicarFiltrosLocais();
+    }
+
+    function mudarSubPerspectivaCid() {
+      const sub = document.getElementById('select-sub-cid').value;
+      const btn = document.getElementById('btn-escolher-cids');
+      
+      // Mostra ou esconde o botão de abrir o modal de CIDs
+      btn.style.display = (sub === 'especifico') ? 'block' : 'none';
+      
+      // Define qual configuração usar baseada na escolha
+      let configKey = 'grupocid';
+      if (sub === 'detalhado') configKey = 'grupocid_detalhado';
+      if (sub === 'especifico') configKey = 'especifico';
+      
+      const config = CONFIG_PERSPECTIVAS[configKey];
+      
+      // Manda a configuração para a nova função desenhadora
+      renderizarInterfaceDePerspectiva(config);
+      
+      // Se for específico e não houver CIDs, força o modal. Senão, atualiza a tela
+      if (sub === 'especifico' && (!config.categorias || config.categorias.length === 0)) {
+          abrirModalSelecaoCids(); // Usa a função do modal que criamos antes
+      } else {
+          if (rawData && rawData.length > 0) aplicarFiltrosLocais();
+      }
+    }
+
+    // =====================================================================
+    // O "Desenhador de Tela" que tiramos de dentro da mudarPerspectiva antiga
+    // =====================================================================
+    function renderizarInterfaceDePerspectiva(config) {
+      document.getElementById('lbl-componentes').innerText = `1. Componentes (${config.titulo})`;
+      document.getElementById('lbl-perspectiva-titulo').innerText = config.titulo;
+      
+      // 1. Gera os Botões Mini Filtros
+      let botoesHtml = `
+        <button class="btn-mini-filter" onclick="marcarComponentes('todas')">Todos</button>
+        <button class="btn-mini-filter" onclick="marcarComponentes('nenhuma')">Nenhum</button>
+      `;
+      if (perspectivaAtual === 'cores') {
+        botoesHtml += `<button class="btn-mini-filter destaque" onclick="marcarComponentes('indicador')">Indicador</button>`;
+      }
+      document.getElementById('botoes-componentes').innerHTML = botoesHtml;
+
+      // 2. Gera os Checkboxes Visuais da Categoria
+      const containerCores = document.getElementById('container-componentes');
+      containerCores.innerHTML = '';
+      if (config.categorias) {
+          config.categorias.forEach(c => {
+            let isChecked = (perspectivaAtual === 'cores' && ['verde', 'vermelho', 'ciano'].includes(c.id)) ? 'checked' : 'checked';
+            let styleCor = c.hexRef && c.hexRef.startsWith('var') ? `background:${c.hexRef}` : `background-color:${c.hexRef || '#94a3b8'}`;
+            
+            containerCores.innerHTML += `
+              <label class="check-item">
+                <input type="checkbox" value="${c.id}" class="chk-componente" onchange="aplicarFiltrosLocais()" ${isChecked}> 
+                <div style="width:14px; height:14px; border-radius:50%; flex-shrink:0; ${styleCor}"></div>
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.nome}">${c.nome}</span>
+              </label>`;
+          });
+      }
+
+      // 3. Gera as Caixas de KPI (Cards Superiores)
+      const kpiGrid = document.getElementById('kpi-grid-container');
+      kpiGrid.innerHTML = '';
+      if (config.categorias) {
+          config.categorias.forEach(c => {
+            let kpiColor = c.hexRef && c.hexRef.startsWith('var') ? c.hexRef : (c.hexRef || '#94a3b8');
+            kpiGrid.innerHTML += `
+              <div class="kpi-card" style="--kpi-color: ${kpiColor};">
+                <div class="kpi-title">${c.nome}</div>
+                <div class="kpi-val" id="kpi-${c.id}">0</div>
+              </div>`;
+          });
+      }
+
+      // 4. Oculta o Filtro Secundário correspondente à visão ativa para não duplicar
+      document.getElementById('sec-group-cores').style.display = perspectivaAtual === 'cores' ? 'none' : 'block';
+      document.getElementById('sec-group-idade').style.display = perspectivaAtual === 'idade' ? 'none' : 'block';
+      document.getElementById('sec-group-sexo').style.display = perspectivaAtual === 'sexo' ? 'none' : 'block';
+      document.getElementById('sec-group-etnia').style.display = perspectivaAtual === 'etnia' ? 'none' : 'block';
+      document.getElementById('sec-group-diagtrat').style.display = perspectivaAtual === 'diagtrat' ? 'none' : 'block';
+      document.getElementById('sec-group-obito').style.display = perspectivaAtual === 'obito' ? 'none' : 'block';
+      document.getElementById('sec-group-grupocid').style.display = perspectivaAtual === 'grupocid' ? 'none' : 'block';
+
+      // 5. Tratamento Especial para CID
+      const displayCid = perspectivaAtual === 'grupocid' ? 'none' : 'block';
+      const secFiltroCid = document.getElementById('filtro-cid');
+      if (secFiltroCid) secFiltroCid.style.display = displayCid;
+      document.querySelectorAll('.sec-filter-title').forEach(l => { if(l.innerText === "CID DIAGNÓSTICO") l.style.display = displayCid; });
+
+      // 6. Expansão de Layout Dinâmico
+      const mainContainer = document.querySelector('.main-content');
+      if (perspectivaAtual === 'grupocid') {
+        mainContainer.classList.add('layout-expandido');
+      } else {
+        mainContainer.classList.remove('layout-expandido');
+      }
+
+      // 7. Refaz o tamanho dos gráficos para a nova tela
+      if (charts.linhas) charts.linhas.resize();
+      if (charts.radar) charts.radar.resize();
+    }
+
+    function marcarSecundario(grupo, acao) {
+      document.querySelectorAll(`.chk-sec-${grupo}`).forEach(cb => {
+        if(acao === true) cb.checked = true;
+        else if(acao === false) cb.checked = false;
+        else if(acao === 'indicador' && grupo === 'cores') {
+          cb.checked = ['verde', 'vermelho', 'ciano'].includes(cb.value);
+        }
+      });
+      aplicarFiltrosLocais();
+    }
+
+    function marcarComponentes(tipo) {
+      document.querySelectorAll('.chk-componente').forEach(cb => {
+        if(tipo === 'todas') cb.checked = true;
+        else if(tipo === 'nenhuma') cb.checked = false;
+        else if(tipo === 'indicador') cb.checked = ['verde', 'vermelho', 'ciano'].includes(cb.value);
+      });
+      aplicarFiltrosLocais();
+    }
+
+    function marcarMeses(estado) { 
+      document.querySelectorAll('.chk-mes').forEach(cb => cb.checked = estado); 
+      aplicarFiltrosLocais(); 
+    }
+
+    function toggleLineView(modo) {
+      modoEvolucao = modo;
+      document.getElementById('btn-val-abs').classList.toggle('active', modo === 'valor');
+      document.getElementById('btn-val-pct').classList.toggle('active', modo === 'porcentagem');
+      document.getElementById('btn-val-bar').classList.toggle('active', modo === 'barras');
+      aplicarFiltrosLocais();
+    }
+    
+    function toggleSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.getElementById('mobile-overlay');
+      if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+      } else {
+        sidebar.classList.toggle('collapsed');
+      }
+    }
+
+    // =========================================================================
+    // 5. NÚCLEO DE DADOS: CACHE, DRIVE E PROCESSAMENTO (MOTOR V2 - SMART CACHE)
+    // =========================================================================
+    function consolidarEFiltrar() {
+      const anoSelecionado = document.getElementById('select-ano-rhc').value;
+      const chaveCache = anoSelecionado + "_" + modeloCalendarioAtual; // Mágica: Etiqueta o cache
+      const dadosBrutos = CACHE_ANOS_PROCESSADOS[chaveCache] || [];
+      console.log(`[BI RHC] 🔄 Iniciando filtragem para a visão: ${chaveCache}`);
+      prepararInterface({ dados: dadosBrutos });
+    }
+
+    function buscarDadosDoServidor() {
+      const selectAno = document.getElementById('select-ano-rhc');
+      const ano = selectAno.value;
+      const chaveAtual = ano === "GLOBAL" ? "GLOBAL_" + modeloCalendarioAtual : ano + "_" + modeloCalendarioAtual;
+      const textoPeriodo = selectAno.options[selectAno.selectedIndex].text;
+
+      document.getElementById('header-periodo-rhc').innerText = textoPeriodo;
+
+      // Sincronização do Cache para a RAM usando a "gaveta" correta
+      const anosDisponiveis = Array.from(selectAno.options).map(o => o.value).filter(v => v !== 'GLOBAL');
+      anosDisponiveis.forEach(a => {
+        const chaveA = a + "_" + modeloCalendarioAtual;
+        if (!CACHE_ANOS_PROCESSADOS[chaveA]) {
+          const cacheLocal = localStorage.getItem('rhc_cache_v2_' + chaveA);
+          if (cacheLocal) {
+            try {
+              const bruto = JSON.parse(cacheLocal);
+              CACHE_ANOS_PROCESSADOS[chaveA] = bruto.map(r => ({
+                cid: r[0], mesAno: r[1], sexo: r[2], etnia: r[3], diagTrat: r[4], obito: r[5],
+                baseDiag: r[6], clinicaTrat: r[7], razaoNaoTrat: r[8], primTrat: r[9], estadoDoenca: r[10], nascimento: r[11]
+              }));
+              console.log(`[Cache] ⚡ Visão ${chaveA} restaurada com sucesso.`);
+            } catch(e) {}
+          }
+        }
+      });
+
+      // Visão Global
+      if (ano === "GLOBAL") {
+        let dadosGlobais = [];
+        let faltamAnos = [];
+
+        anosDisponiveis.forEach(a => {
+          const chaveA = a + "_" + modeloCalendarioAtual;
+          if (CACHE_ANOS_PROCESSADOS[chaveA]) dadosGlobais = dadosGlobais.concat(CACHE_ANOS_PROCESSADOS[chaveA]);
+          else faltamAnos.push(a);
+        });
+
+        if (faltamAnos.length > 0) {
+          document.getElementById('loader').style.display = 'none';
+          alert("Ainda faltam dados históricos (" + faltamAnos.join(', ') + ").\nAguarde o robô baixar em segundo plano e tente novamente em instantes.");
+          document.getElementById('select-ano-rhc').selectedIndex = 0; 
+          preCarregarOutrosAnos();
+          return;
+        }
+
+        console.log(`[BI RHC] 🌍 Visão Global montada! Total: ${dadosGlobais.length} registros.`);
+        CACHE_ANOS_PROCESSADOS[chaveAtual] = dadosGlobais;
+        consolidarEFiltrar();
+        return;
+      }
+
+      // Visão Ano Específico já na RAM (CARREGAMENTO INSTANTÂNEO)
+      if (CACHE_ANOS_PROCESSADOS[chaveAtual]) {
+        console.log(`[BI RHC] 🚀 Recuperando ${chaveAtual} instantaneamente da memória.`);
+        consolidarEFiltrar();
+        return;
+      }
+
+      // Sem Cache - Busca no Drive (Servidor)
+      console.log(`[BI RHC] 📡 Nenhum cache para ${chaveAtual}. Solicitando ao Google Drive...`);
+      document.getElementById('loader').style.display = 'flex';
+      document.getElementById('loader-msg').innerText = "Sincronizando dados institucionais...";
+
+      google.script.run.withSuccessHandler(res => {
+        let basesPorMes = {};
+        res.forEach(b => {
+          let passoStr = (b.PASSO || "").toUpperCase();
+          let statusStr = (b.STATUS || "").toUpperCase();
+          if (passoStr.includes('PASSO 2') && !statusStr.includes('ERRO') && !statusStr.includes('XLS')) {
+            const meses = { "JAN":1, "FEV":2, "MAR":3, "ABR":4, "MAI":5, "JUN":6, "JUL":7, "AGO":8, "SET":9, "OUT":10, "NOV":11, "DEZ":12 };
+            const nMes = meses[b.MES ? b.MES.substring(0,3).toUpperCase() : ""]; 
+            const nAno = parseInt(b.ANO); 
+            const ref = parseInt(ano);
+            
+            if (nAno < 2025 || (nAno === 2025 && nMes < 10)) return; 
+            
+            // SELEÇÃO INTELIGENTE DE IDS (Civil = Jan-Dez / RHC = Out-Set)
+            let pertence = false;
+            if (modeloCalendarioAtual === "CIVIL") {
+               pertence = (nAno === ref);
+            } else {
+               pertence = ((nMes >= 10 && nAno === (ref - 1)) || (nMes <= 9 && nAno === ref));
+            }
+
+            if (pertence) {
+               basesPorMes[b.MES] = b.ID;
+            }
+          }
+        });
+        
+        let idsAlvo = Object.values(basesPorMes);
+        
+        if(idsAlvo.length === 0 && parseInt(ano) > 2025) {
+          alert(`Nenhuma base consolidada encontrada no DB_LINKS para ${ano}.`); 
+          document.getElementById('loader').style.display = 'none'; 
+          return;
+        }
+        
+        document.getElementById('loader-msg').innerText = "[ Extraindo dados e histórico... ]";
+        
+        google.script.run.withSuccessHandler(function(dadosProcessados) {
+          console.log(`[BI RHC] ✅ Dados de ${chaveAtual} recebidos.`);
+          CACHE_ANOS_PROCESSADOS[chaveAtual] = dadosProcessados.dados;
+          
+          try {
+            const cacheCompacto = dadosProcessados.dados.map(d => [
+              d.cid, d.mesAno, d.sexo, d.etnia, d.diagTrat, d.obito, 
+              d.baseDiag, d.clinicaTrat, d.razaoNaoTrat, d.primTrat, d.estadoDoenca, d.nascimento
+            ]);
+            localStorage.setItem('rhc_cache_v2_' + chaveAtual, JSON.stringify(cacheCompacto));
+            console.log(`[Cache] 💾 ${chaveAtual} salvo no Disco Local.`);
+          } catch (e) {}
+          
+          consolidarEFiltrar();
+          document.getElementById('loader').style.display = 'none';
+          
+          // 🛡️ MUDANÇA AQUI: Repassa a variável 'res' (os links) para o robô
+          setTimeout(() => preCarregarOutrosAnos(res), 3000);
+          
+        }).buscarIndicadoresDasBases(idsAlvo, ano, modeloCalendarioAtual);
+
+      }).buscarLinksRegistrados();
+    }
+
+    async function preCarregarOutrosAnos(linksTotais) {
+      // 🛡️ Se o robô for chamado pela Visão Global e não tiver os links, ele busca primeiro!
+      if (!linksTotais) {
+        console.log("[BI RHC] 🤖 Buscando links do Hub para o robô de pre-carregamento...");
+        google.script.run.withSuccessHandler(preCarregarOutrosAnos).buscarLinksRegistrados();
+        return;
+      }
+
+      const select = document.getElementById('select-ano-rhc');
+      const anosDisponiveis = Array.from(select.options).map(opt => opt.value).filter(v => v !== 'GLOBAL');
+      const anoAtualAtivo = select.value;
+
+      console.log("[BI RHC] 🤖 Iniciando robô de pré-carregamento histórico em segundo plano...");
+
+      for (let ano of anosDisponiveis) {
+        const chaveA = ano + "_" + modeloCalendarioAtual;
+        
+        if (ano === anoAtualAtivo || CACHE_ANOS_PROCESSADOS[chaveA] || localStorage.getItem('rhc_cache_v2_' + chaveA)) {
+          continue; // Pula se já estiver salvo na memória ou disco
+        }
+
+        // 🛡️ O ROBÔ AGORA CALCULA QUAIS PLANILHAS PERTENCEM AO ANO QUE ESTÁ BAIXANDO
+        let basesPorMes = {};
+        linksTotais.forEach(b => {
+          let passoStr = (b.PASSO || "").toUpperCase();
+          let statusStr = (b.STATUS || "").toUpperCase();
+          if (passoStr.includes('PASSO 2') && !statusStr.includes('ERRO') && !statusStr.includes('XLS')) {
+            const meses = { "JAN":1, "FEV":2, "MAR":3, "ABR":4, "MAI":5, "JUN":6, "JUL":7, "AGO":8, "SET":9, "OUT":10, "NOV":11, "DEZ":12 };
+            const nMes = meses[b.MES ? b.MES.substring(0,3).toUpperCase() : ""]; 
+            const nAno = parseInt(b.ANO); 
+            const ref = parseInt(ano);
+            
+            if (nAno < 2025 || (nAno === 2025 && nMes < 10)) return; 
+            
+            let pertence = false;
+            if (modeloCalendarioAtual === "CIVIL") {
+               pertence = (nAno === ref);
+            } else {
+               pertence = ((nMes >= 10 && nAno === (ref - 1)) || (nMes <= 9 && nAno === ref));
+            }
+
+            if (pertence) {
+               basesPorMes[b.MES] = b.ID;
+            }
+          }
+        });
+        
+        let idsAlvo = Object.values(basesPorMes); // Lista com os IDs do Hub para o servidor ler
+
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Dá um respiro pro servidor do Google
+        console.log(`[BI RHC] 📥 Robô pré-carregando silenciosamente a visão ${chaveA}... com ${idsAlvo.length} bases.`);
+        
+        google.script.run.withSuccessHandler(function(res) {
+          if (res && res.dados) {
+            CACHE_ANOS_PROCESSADOS[chaveA] = res.dados;
+            try {
+              const cacheCompacto = res.dados.map(d => [
+                d.cid, d.mesAno, d.sexo, d.etnia, d.diagTrat, d.obito, 
+                d.baseDiag, d.clinicaTrat, d.razaoNaoTrat, d.primTrat, d.estadoDoenca, d.nascimento
+              ]);
+              localStorage.setItem('rhc_cache_v2_' + chaveA, JSON.stringify(cacheCompacto));
+              console.log(`[BI RHC] 🤖✅ Visão ${chaveA} processada e salva no cache.`);
+            } catch(e) {}
+          }
+        // 🛡️ AQUI O ROBÔ MANDA OS IDs CORRETOS E O MODELO DE CALENDÁRIO PRO SERVIDOR:
+        }).buscarIndicadoresDasBases(idsAlvo, ano, modeloCalendarioAtual); 
+      }
+    }
+
+    function limparCachePersistente() {
+      const confirmacao = confirm("ATENÇÃO: Isso apagará os dados salvos neste computador.\n\nDeseja continuar?");
+      if (confirmacao) {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('rhc_cache')) localStorage.removeItem(key);
+        });
+        CACHE_ANOS_PROCESSADOS = {};
+        alert("Cache limpo com sucesso! O painel irá sincronizar os dados atualizados agora.");
+        buscarDadosDoServidor(); 
+      }
+    }
+
+    // =========================================================================
+    // 6. NORMALIZAÇÃO DE DADOS (PREPARAR INTERFACE)
+    // =========================================================================
+    function prepararInterface(res) {
+      const isGlobal = document.getElementById('select-ano-rhc').value === 'GLOBAL'; 
+      document.getElementById('loader').style.display = 'none';
+      if (!res || !res.dados) return;
+      
+      if (res.erros && res.erros.length > 0) {
+         console.error("ERRO DETECTADO NA LEITURA DO GOOGLE SHEETS:", res.erros);
+         alert("Atenção: Houve um erro ao ler algumas planilhas. Pressione F12 para ver os detalhes no Console.");
+      }
+      
+      if (!res.dados || res.dados.length === 0) {
+         alert("O processamento retornou 0 pacientes.");
+         return;
+      }
+
+      rawData = res.dados.map(d => {
+        // --- TRAVA DE SEGURANÇA 2026 ---
+        let anoCalculado = obterAnoAgrupamento(d.mesAno);
+        if (anoCalculado === "2026") {
+            d.primTrat = ""; 
+            d.estadoDoenca = ""; 
+            d.razaoNaoTrat = ""; 
+            d.baseDiag = ""; 
+            d.clinicaTrat = "";
+        }
+        // ------------------------------
+
+        let cor = (d.corSimulada || "").toLowerCase().trim();
+        let catCor = 'branco';
+
+        if (['#00ff00', '#34a853', '#38761d', '#00e500', '#2ecc71', '#00b050', '#d9ead3', '#b6d7a8', '#93c47d', '#6aa84f'].some(c => cor.includes(c))) catCor = 'verde';
+        else if (['#ff0000', '#ea4335', '#cc0000', '#f4cccc', '#ea9999', '#e06666', '#990000', '#660000'].some(c => cor.includes(c))) catCor = 'vermelho';
+        else if (['#00ffff', '#0ff', '#e0ffff'].some(c => cor.includes(c))) catCor = 'ciano';
+        else if (['#9900ff', '#8e7cc3', '#674ea7', '#800080', '#9b59b6', '#7030a0', '#ff00ff', '#d5a6bd', '#c27ba0', '#a64d79', '#741b47', '#4c1130', '#ead1dc', '#d9d2e9', '#b4a7d6', '#351c75', '#20124d', '#c90076', '#d81b60'].some(c => cor.includes(c))) catCor = 'magenta';
+        else if (['#ffff00', '#fbbc04', '#f1c40f', '#fff200', '#f1c232', '#bf9000', '#fff2cc', '#ffe599'].some(c => cor.includes(c))) catCor = 'amarelo';
+        else if (['#ff9900', '#fa7b17', '#e67c73', '#f39c12', '#ed7d31', '#fce5cd', '#f9cb9c', '#f6b26b', '#e69138', '#b45f06', '#783f04'].some(c => cor.includes(c))) catCor = 'laranja';
+
+        let idadeTratada = null;
+        try {
+            if (d.nascimento && String(d.nascimento).trim() !== "") {
+                let strNasc = String(d.nascimento).trim();
+                let dataNasc = null;
+                let matchBR = strNasc.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+                if (matchBR) {
+                    dataNasc = new Date(matchBR[3], parseInt(matchBR[2])-1, matchBR[1]);
+                } else {
+                    let matchISO = strNasc.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
+                    if (matchISO) {
+                        dataNasc = new Date(matchISO[1], parseInt(matchISO[2])-1, matchISO[3]);
+                    }
+                }
+                if (dataNasc && !isNaN(dataNasc.getTime())) {
+                    let hoje = new Date();
+                    idadeTratada = hoje.getFullYear() - dataNasc.getFullYear();
+                    let m = hoje.getMonth() - dataNasc.getMonth();
+                    if (m < 0 || (m === 0 && hoje.getDate() < dataNasc.getDate())) { idadeTratada--; }
+                    if (idadeTratada < 0 || idadeTratada > 130) { idadeTratada = null; }
+                }
+            }
+        } catch (e) {}
+        
+        if (idadeTratada === null && d.idade !== undefined && d.idade !== null && String(d.idade).trim() !== "") {
+            idadeTratada = parseInt(d.idade);
+        }
+
+        let etniaTratada = d.etnia ? String(d.etnia).trim().toUpperCase() : '';
+        let sexoTratado = d.sexo ? String(d.sexo).trim().toUpperCase() : '';
+        let valorDiag = d.diagTrat ? String(d.diagTrat).trim().toUpperCase() : ''; 
+        
+        let catDiag = 'outros';
+        if (valorDiag.includes("1.") || valorDiag.includes("SEM DIAGNÓSTICO E SEM TRATAMENTO")) catDiag = '1';
+        else if (valorDiag.includes("2.") || valorDiag.includes("COM DIAGNÓSTICO E SEM TRATAMENTO")) catDiag = '2';
+        else if (valorDiag.includes("3.") || valorDiag.includes("COM DIAGNÓSTICO E COM TRATAMENTO")) catDiag = '3';
+        else if (valorDiag.includes("4.") || valorDiag.includes("SEM INFORMAÇÃO")) catDiag = 'outros';
+
+        let catIdade = 'sem_idade';
+        if (idadeTratada !== null && !isNaN(idadeTratada)) {
+          if (idadeTratada < 18) catIdade = '0-17';
+          else if (idadeTratada <= 39) catIdade = '18-39';
+          else if (idadeTratada <= 59) catIdade = '40-59';
+          else catIdade = '60+';
+        }
+
+        let catSexo = 'sem_sexo';
+        if (sexoTratado.startsWith('M')) catSexo = 'M';
+        else if (sexoTratado.startsWith('F')) catSexo = 'F';
+        
+        let catEtnia = ['BRANCA','PRETA','PARDA','AMARELA','INDIGENA'].includes(etniaTratada) ? etniaTratada : 'sem_etnia';
+
+        let cidTratado = d.cid ? String(d.cid).trim().toUpperCase() : 'NÃO INFORMADO';
+        let catGrupoCID = classificarGrupoCID(cidTratado);
+        let catGrupoCID2 = classificarGrupoCID_Tipo2(cidTratado); // <--- NOVA INTEGRAÇÃO: CLASSIFICADOR DETALHADO DA OMS
+
+        let pt = (d.primTrat || "").toString().toUpperCase().trim();
+        let catPrimTrat = 'SEM_INFO';
+        if (pt.includes('CIRURGIA')) catPrimTrat = 'CIRURGIA';
+        else if (pt.includes('RADIOTERAPIA')) catPrimTrat = 'RADIOTERAPIA';
+        else if (pt.includes('QUIMIOTERAPIA')) catPrimTrat = 'QUIMIOTERAPIA';
+        else if (pt.includes('HORMONIOTERAPIA') || pt.includes('HORMÔNIO')) catPrimTrat = 'HORMONIOTERAPIA';
+        else if (pt.includes('TMO') || pt.includes('TRANSPLANTE')) catPrimTrat = 'TMO';
+        else if (pt.includes('IMUNOTERAPIA')) catPrimTrat = 'IMUNOTERAPIA';
+        else if (pt.includes('NENHUM')) catPrimTrat = 'NENHUM';
+        else if (pt.includes('OUTRA')) catPrimTrat = 'OUTRAS';
+
+        let ed = (d.estadoDoenca || "").toString().toUpperCase().trim();
+        let catEstadoDoenca = 'SEM_INFO';
+        if (ed.includes('REMISSÃO COMPLETA') || ed.includes('SEM EVIDÊNCIA')) catEstadoDoenca = 'REM_COMPLETA';
+        else if (ed.includes('REMISSÃO PARCIAL')) catEstadoDoenca = 'REM_PARCIAL';
+        else if (ed.includes('ESTÁVEL') || ed.includes('ESTAVEL')) catEstadoDoenca = 'ESTAVEL';
+        else if (ed.includes('PROGRESSÃO') || ed.includes('PROGRESSAO')) catEstadoDoenca = 'PROGRESSAO';
+        else if (ed.includes('PALIATIVO') || ed.includes('SUPORTE')) catEstadoDoenca = 'PALIATIVOS';
+        else if (ed.includes('ÓBITO') || ed.includes('OBITO')) catEstadoDoenca = 'OBITO';
+        else if (ed.includes('NÃO SE APLICA') || ed.includes('NAO SE APLICA')) catEstadoDoenca = 'NAO_APLICA';
+
+        let rnt = (d.razaoNaoTrat || "").toString().toUpperCase().trim();
+        let catRazaoNaoTrat = 'SEM_INFO';
+        if (rnt.includes('RECUSA')) catRazaoNaoTrat = 'RECUSA';
+        else if (rnt.includes('FORA')) catRazaoNaoTrat = 'FORA';
+        else if (rnt.includes('AVANÇADA') || rnt.includes('FALTA DE CONDIÇÕES') || rnt.includes('CONDICOES')) catRazaoNaoTrat = 'AVANCADA_CLINICA';
+        else if (rnt.includes('ABANDONO')) catRazaoNaoTrat = 'ABANDONO';
+        else if (rnt.includes('COMPLICAÇÕES') || rnt.includes('COMPLICACOES')) catRazaoNaoTrat = 'COMPLICACOES';
+        else if (rnt.includes('ÓBITO') || rnt.includes('OBITO')) catRazaoNaoTrat = 'OBITO';
+        else if (rnt.includes('NÃO SE APLICA') || rnt.includes('NAO SE APLICA')) catRazaoNaoTrat = 'NAO_APLICA';
+        else if (rnt.includes('OUTRA')) catRazaoNaoTrat = 'OUTRAS';
+
+        let bd = (d.baseDiag || "").toString().toUpperCase().trim();
+        let catBaseDiag = 'SEM_INFO';
+        if (bd.includes('PESQUISA')) catBaseDiag = 'PESQUISA';
+        else if (bd.includes('IMAGEM')) catBaseDiag = 'IMAGEM';
+        else if (bd.includes('CLÍNICA') || bd.includes('CLINICA')) catBaseDiag = 'CLINICA';
+        else if (bd.includes('MARCADORES')) catBaseDiag = 'MARCADORES';
+        else if (bd.includes('CITOLOGIA')) catBaseDiag = 'CITOLOGIA';
+        else if (bd.includes('METÁSTASE') || bd.includes('METASTASE')) catBaseDiag = 'HISTO_META';
+        else if (bd.includes('PRIMÁRIO') || bd.includes('PRIMARIO')) catBaseDiag = 'HISTO_PRIM';
+
+        let ct = (d.clinicaTrat || "").toString().toUpperCase().trim();
+        let catClinica = 'SEM_INFO';
+        if (ct.includes('ALERGIA') || ct.includes('IMUNOLOGIA')) catClinica = 'ALERGIA_IMUNO';
+        else if (ct.includes('CARDÍACA') || ct.includes('CARDIACA')) catClinica = 'CIR_CARDIACA';
+        else if (ct.includes('CABEÇA') || ct.includes('CABECA') || ct.includes('PESCOÇO') || ct.includes('PESCOCO')) catClinica = 'CABECA_PESCOCO';
+        else if (ct.includes('CIRURGIA GERAL') || ct.includes('CX GERAL') || (ct.includes('GERAL') && ct.includes('CIR'))) catClinica = 'CIR_GERAL';
+        else if (ct.includes('PEDIATRIA CIR') || ct.includes('CIRURGIA PEDIAT')) catClinica = 'PED_CIR';
+        else if (ct.includes('PLÁSTICA REPARADORA') || ct.includes('PLASTICA REPARADORA')) catClinica = 'PLAST_REPARADORA';
+        else if (ct.includes('PLÁSTICA') || ct.includes('PLASTICA')) catClinica = 'CIR_PLASTICA';
+        else if (ct.includes('TORÁCICA') || ct.includes('TORACICA')) catClinica = 'CIR_TORACICA';
+        else if (ct.includes('VASCULAR')) catClinica = 'CIR_VASCULAR';
+        else if (ct.includes('CLÍNICA MÉDICA') || ct.includes('CLINICA MEDICA')) catClinica = 'CLIN_MEDICA';
+        else if (ct.includes('DERMATOLOGIA') || ct.includes('DERMATO')) catClinica = 'DERMATO';
+        else if (ct.includes('ENDOCRINO')) catClinica = 'ENDOCRINO';
+        else if (ct.includes('GASTROCIRURGIA')) catClinica = 'GASTRO_CIR';
+        else if (ct.includes('GASTROENTEROLOGIA')) catClinica = 'GASTRO_CLIN';
+        else if (ct.includes('GERIATRIA')) catClinica = 'GERIATRIA';
+        else if (ct.includes('GINECOLOGIA') && (ct.includes('OBS') || ct.includes('OBSTETRÍCIA'))) catClinica = 'GINECO_OBS';
+        else if (ct.includes('GINECOLOGIA') || ct.includes('GINECO')) catClinica = 'GINECO';
+        else if (ct.includes('HEMATOLOGIA CLÍNICA') || ct.includes('HEMATO CLIN')) catClinica = 'HEMATO_CLIN';
+        else if (ct.includes('INFECTOLOGIA') || ct.includes('INFECTO')) catClinica = 'INFECTO';
+        else if (ct.includes('NEFROLOGIA') || ct.includes('NEFRO')) catClinica = 'NEFRO';
+        else if (ct.includes('NEUROCIRURGIA')) catClinica = 'NEUROCIR';
+        else if (ct.includes('NEUROLOGIA')) catClinica = 'NEUROLOGIA';
+        else if (ct.includes('OFTALMOLOGIA') || ct.includes('OFTALMO')) catClinica = 'OFTALMO';
+        else if (ct.includes('ONCOLOGIA CIRÚRGICA') || ct.includes('ONCOLOGIA CIRURGICA')) catClinica = 'ONCO_CIR';
+        else if (ct.includes('ONCOLOGIA CUTÂNEA') || ct.includes('ONCO CUT')) catClinica = 'ONCO_CUTANEA';
+        else if (ct.includes('ONCOLOGIA CLÍNICA') || ct.includes('ONCOLOGIA CLINICA') || ct.includes('ONCO CLIN')) catClinica = 'ONCO_CLIN';
+        else if (ct.includes('PEDIATRIA ONCOLÓGICA') || ct.includes('PEDIATRIA ONCOLOGICA') || ct.includes('ONCO PED')) catClinica = 'PED_ONCO';
+        else if (ct.includes('ORTOPEDIA') || ct.includes('ORTO')) catClinica = 'ORTO';
+        else if (ct.includes('OTORRINOLARINGOLOGIA') || ct.includes('OTORRINO')) catClinica = 'OTORRINO';
+        else if (ct.includes('PEDIATRIA')) catClinica = 'PEDIATRIA';
+        else if (ct.includes('PNEUMOLOGIA') || ct.includes('PNEUMO')) catClinica = 'PNEUMO';
+        else if (ct.includes('PROCTOLOGIA') || ct.includes('PROCTO')) catClinica = 'PROCTO';
+        else if (ct.includes('RADIOTERAPIA') || ct.includes('RADIO')) catClinica = 'RADIO';
+        else if (ct.includes('UROLOGIA')) catClinica = 'UROLOGIA';
+        else if (ct.includes('MASTOLOGIA') || ct.includes('MASTO')) catClinica = 'MASTO';
+        else if (ct.includes('ABDÔMEN PÉLVICA') || ct.includes('ABDOMEN PELVICA')) catClinica = 'ABDOMEN_PELVICA';
+        else if (ct.includes('CIRURGIA PÉLVICA') || ct.includes('PELVICA')) catClinica = 'CIR_PELVICA';
+        else if (ct.includes('CIRURGIA ABDOMINAL') || ct.includes('ABDOMINAL')) catClinica = 'CIR_ABDOMINAL';
+        else if (ct.includes('ESTOMATO')) catClinica = 'ESTOMATO';
+        else if (ct.includes('ODONTO')) catClinica = 'ODONTO';
+        else if (ct.includes('CEMO')) catClinica = 'CEMO';
+        else if (ct.includes('ENDOSCOPIA')) catClinica = 'ENDOSCOPIA';
+        else if (ct.includes('TECIDO ÓSSEO') || ct.includes('TECIDO OSSEO') || ct.includes('CONECTIVO')) catClinica = 'TEC_OSSEO';
+        else if (ct.includes('HEMOTERAPIA')) catClinica = 'HEMOTERAPIA';
+        else if (ct.includes('MEDICINA NUCLEAR') || ct.includes('NUCLEAR')) catClinica = 'MED_NUCLEAR';
+        else if (ct.includes('PSIQUIATRIA')) catClinica = 'PSIQUIATRIA';
+        else if (ct.includes('TRIAGEM')) catClinica = 'TRIAGEM';
+        else if (ct.includes('CLÍNICA DA DOR') || ct.includes('CLINICA DA DOR') || ct.includes('DOR')) catClinica = 'CLIN_DOR';
+        else if (ct.includes('SUPORTE') && ct.includes('ONCO')) catClinica = 'SUPORTE_ONCO';
+        else if (ct.includes('NÃO SE APLICA') || ct.includes('NAO SE APLICA')) catClinica = 'NAO_APLICA';
+        else if (ct !== "") catClinica = 'SEM_INFO';
+
+        let mesAnoOriginal = d.mesAno ? d.mesAno : "S/D";
+        let tempoRef = mesAnoOriginal; 
+        
+        if (isGlobal && mesAnoOriginal !== "S/D") {
+            tempoRef = obterAnoAgrupamento(mesAnoOriginal);
+        }
+
+        return { 
+          ...d,
+          tempoAgrupamento: tempoRef, 
+          cat_cores: catCor,
+          cat_grupocid: catGrupoCID,
+          cat_grupocid_detalhado: catGrupoCID2, // <--- INTEGRAÇÃO AQUI: Disponibilizando para os filtros dinâmicos
+          cat_idade: catIdade,
+          cat_sexo: catSexo,
+          cat_etnia: catEtnia,
+          cat_diagtrat: catDiag,
+          cat_obito: d.obito ? "OBITO" : "VIVO",
+          cat_primTrat: catPrimTrat,
+          cat_estadoDoenca: catEstadoDoenca,
+          cat_razaoNaoTrat: catRazaoNaoTrat,
+          cat_baseDiag: catBaseDiag,
+          cat_clinicaTrat: catClinica,
+          cid: cidTratado,
+          sexo: sexoTratado,
+          etnia: etniaTratada,
+          idade: idadeTratada,
+          obito: d.obito === true ? true : false,
+          diagTrat: valorDiag
+        };
+      });
+
+      const cidsUnicos = [...new Set(rawData.map(d => d.cid))].filter(Boolean).sort();
+      const selCid = document.getElementById('filtro-cid');
+      if (selCid) {
+        selCid.innerHTML = '<option value="">Todos os CIDs</option>';
+        cidsUnicos.forEach(cid => { selCid.innerHTML += `<option value="${cid}">${cid}</option>`; });
+      }
+
+      const temposDisp = [...new Set(rawData.map(d => d.tempoAgrupamento))];
+      if (isGlobal) temposDisp.sort(); 
+      else temposDisp.sort(ordemAnoRHC);
+
+      const container = document.getElementById('container-meses');
+      container.innerHTML = '';
+      temposDisp.forEach(tempo => {
+        container.innerHTML += `<label class="check-item"><input type="checkbox" value="${tempo}" class="chk-mes" onchange="aplicarFiltrosLocais()" checked> ${tempo}</label>`;
+      });
+      
+      aplicarFiltrosLocais();
+    }
+
+    // =========================================================================
+    // 7. FILTROS E DISTRIBUIÇÃO DA TELA
+    // =========================================================================
+    function aplicarFiltrosLocais() {
+      const isGlobal = document.getElementById('select-ano-rhc').value === 'GLOBAL';
+      
+      const radarTitle = document.querySelector('#box-radar .chart-title span');
+      if(radarTitle) {
+        radarTitle.innerHTML = isGlobal ? '<i class="fa-solid fa-satellite-dish"></i> Radar Ano a Ano' : '<i class="fa-solid fa-satellite-dish"></i> Radar Mês a Mês';
+      }
+
+      const chkMeses = document.querySelectorAll('.chk-mes:checked');
+      const mesesSel = Array.from(chkMeses).map(cb => cb.value);
+      const componentesSel = Array.from(document.querySelectorAll('.chk-componente:checked')).map(cb => cb.value);
+      
+      const secGrupocid = Array.from(document.querySelectorAll('.chk-sec-grupocid:checked')).map(cb => cb.value);
+      const secCores = Array.from(document.querySelectorAll('.chk-sec-cores:checked')).map(cb => cb.value);
+      const secIdade = Array.from(document.querySelectorAll('.chk-sec-idade:checked')).map(cb => cb.value);
+      const secSexo = Array.from(document.querySelectorAll('.chk-sec-sexo:checked')).map(cb => cb.value);
+      const secEtnia = Array.from(document.querySelectorAll('.chk-sec-etnia:checked')).map(cb => cb.value);
+      const secDiagtrat = Array.from(document.querySelectorAll('.chk-sec-diagtrat:checked')).map(cb => cb.value);
+      const secObito = Array.from(document.querySelectorAll('.chk-sec-obito:checked')).map(cb => cb.value);
+
+      // --- NOVA INTEGRAÇÃO: Roteamento de Chave Dinâmica ---
+      let chaveCatFinal = 'cat_' + perspectivaAtual;
+      let configKey = perspectivaAtual;
+       
+      if (perspectivaAtual === 'grupocid') {
+          const subEl = document.getElementById('select-sub-cid');
+          if (subEl) {
+              const sub = subEl.value;
+              if (sub === 'detalhado') {
+                  chaveCatFinal = 'cat_grupocid_detalhado';
+                  configKey = 'grupocid_detalhado';
+              }
+              if (sub === 'especifico') {
+                  chaveCatFinal = 'cid'; // Usa o CID bruto para cruzar com a lista do modal
+                  configKey = 'especifico';
+              }
+          }
+      }
+      // ------------------------------------------------------
+
+      let baseDemograficaPreCid = rawData.filter(d => {
+        if (perspectivaAtual !== 'grupocid' && !secGrupocid.includes(d.cat_grupocid)) return false;
+        if (perspectivaAtual !== 'cores' && !secCores.includes(d.cat_cores)) return false;
+        if (perspectivaAtual !== 'idade' && !secIdade.includes(d.cat_idade)) return false;
+        if (perspectivaAtual !== 'sexo'  && !secSexo.includes(d.cat_sexo)) return false;
+        if (perspectivaAtual !== 'etnia' && !secEtnia.includes(d.cat_etnia)) return false;
+        if (perspectivaAtual !== 'diagtrat' && !secDiagtrat.includes(d.cat_diagtrat)) return false;
+        if (perspectivaAtual !== 'obito' && !secObito.includes(d.cat_obito)) return false;
+        return true;
+      });
+
+      const selCid = document.getElementById('filtro-cid');
+      let cidPreSelecionado = selCid.value;
+      let cidsDisponiveis = [...new Set(baseDemograficaPreCid.map(d => d.cid))].filter(Boolean).sort();
+      
+      selCid.innerHTML = '<option value="">Todos os CIDs (Reflete Grupos Selecionados)</option>';
+      cidsDisponiveis.forEach(cid => { 
+        selCid.innerHTML += `<option value="${cid}" ${cid === cidPreSelecionado ? 'selected' : ''}>${cid}</option>`; 
+      });
+      let vCidFinal = selCid.value;
+
+      const baseDemografica = baseDemograficaPreCid.filter(d => {
+        if (vCidFinal && vCidFinal !== "" && d.cid !== vCidFinal) return false;
+        return true;
+      });
+
+      // Aqui agora usamos o chaveCatFinal calculado acima
+      dadosAtivosNoFiltro = baseDemografica.filter(d => mesesSel.includes(d.tempoAgrupamento) && componentesSel.includes(d[chaveCatFinal]));
+
+      const btnPct = document.getElementById('btn-val-pct');
+      const btnAbs = document.getElementById('btn-val-abs');
+      const btnBar = document.getElementById('btn-val-bar');
+      const boxEvolucao = document.getElementById('box-evolucao');
+      const boxRadar = document.getElementById('box-radar');
+      const containerGraficos = document.getElementById('container-graficos-superiores');
+
+      let showEvolucao = mesesSel.length > 1;
+      let showRadar = componentesSel.length > 1 && mesesSel.length > 0;
+
+      if (componentesSel.length <= 1) {
+        if (modoEvolucao === 'porcentagem') modoEvolucao = 'valor'; 
+        if (btnPct) btnPct.style.display = 'none';
+        if (btnAbs) btnAbs.classList.toggle('active', modoEvolucao === 'valor');
+        if (btnPct) btnPct.classList.remove('active');
+        if (btnBar) btnBar.classList.toggle('active', modoEvolucao === 'barras');
+      } else {
+        if (btnPct) btnPct.style.display = 'inline-block';
+        if (btnAbs) btnAbs.classList.toggle('active', modoEvolucao === 'valor');
+        if (btnPct) btnPct.classList.toggle('active', modoEvolucao === 'porcentagem');
+        if (btnBar) btnBar.classList.toggle('active', modoEvolucao === 'barras');
+      }
+
+      if(boxEvolucao) boxEvolucao.style.display = showEvolucao ? 'flex' : 'none';
+      if(boxRadar) boxRadar.style.display = showRadar ? 'flex' : 'none';
+
+      if(containerGraficos) {
+        if (!showEvolucao || !showRadar) containerGraficos.classList.add('single-chart'); 
+        else containerGraficos.classList.remove('single-chart'); 
+      }
+
+      document.getElementById('status-periodo').innerText = `Análise de ${mesesSel.length} ${isGlobal ? 'anos' : 'meses'} e ${componentesSel.length} chaves da perspectiva.`;
+      
+      let componentesGlobais = {};
+      let evolucao = {};
+      let qtdGlobalPorCat = {};
+      let qtdMensalGlobalPorCat = {};
+      
+      // Usa a configKey adequada para gerar as categorias (Macros, OMS ou CIDs do Modal)
+      const configAtual = CONFIG_PERSPECTIVAS[configKey].categorias;
+
+      configAtual.forEach(c => {
+        componentesGlobais[c.id] = 0;
+        qtdGlobalPorCat[c.id] = 0;
+      });
+
+      mesesSel.forEach(m => {
+        evolucao[m] = {};
+        qtdMensalGlobalPorCat[m] = {};
+        configAtual.forEach(c => {
+           evolucao[m][c.id] = 0;
+           qtdMensalGlobalPorCat[m][c.id] = 0;
+        });
+      });
+
+      baseDemografica.forEach(d => {
+        let valCat = d[chaveCatFinal]; // Atualizado
+        if(qtdGlobalPorCat[valCat] !== undefined) qtdGlobalPorCat[valCat]++;
+        if(!qtdMensalGlobalPorCat[d.tempoAgrupamento]) {
+            qtdMensalGlobalPorCat[d.tempoAgrupamento] = {};
+            configAtual.forEach(c => qtdMensalGlobalPorCat[d.tempoAgrupamento][c.id] = 0);
+        }
+        if(qtdMensalGlobalPorCat[d.tempoAgrupamento][valCat] !== undefined) qtdMensalGlobalPorCat[d.tempoAgrupamento][valCat]++;
+      });
+
+      dadosAtivosNoFiltro.forEach(d => {
+        let valCat = d[chaveCatFinal]; // Atualizado
+        if (componentesGlobais[valCat] !== undefined) componentesGlobais[valCat]++; 
+        if (evolucao[d.tempoAgrupamento] && evolucao[d.tempoAgrupamento][valCat] !== undefined) evolucao[d.tempoAgrupamento][valCat]++;
+      });
+
+      let totalFiltrado = dadosAtivosNoFiltro.length;
+      totalGeralAno = baseDemografica.length;
+      
+      document.getElementById('lbl-total-global').innerText = totalGeralAno;
+      animarValor("header-total-pacientes", totalFiltrado);
+      Object.keys(componentesGlobais).forEach(c => animarValor("kpi-" + c, componentesGlobais[c]));
+      
+      renderProporcionalidade(componentesGlobais, totalFiltrado, componentesSel, mesesSel, evolucao, qtdGlobalPorCat, qtdMensalGlobalPorCat, totalGeralAno, configAtual);
+      if (showEvolucao) renderGraficos(evolucao, mesesSel, componentesSel, configAtual);
+      if (showRadar) iniciarCarrosselRadar(evolucao, mesesSel, componentesSel, configAtual);
+      
+      renderGraficosSecundariosTransversais();
+      renderizarGraficoGruposCid(); 
+      renderizarGraficoCids(); 
+      gerenciarVisibilidadeTelas();
+    }
+
+    // =========================================================================
+    // 8. RENDERIZAÇÃO DOS GRÁFICOS
+    // =========================================================================
+    function renderGraficosSecundariosTransversais() {
+      const contDemo = document.getElementById('container-demograficos');
+      const contClin = document.getElementById('container-clinicos');
+      const contTrat = document.getElementById('container-clinica-trat');
+      
+      contDemo.innerHTML = ''; contClin.innerHTML = ''; contTrat.innerHTML = '';
+      if (dadosAtivosNoFiltro.length === 0) return;
+
+      const anoSelecionado = document.getElementById('select-ano-rhc').value;
+      let chavesAtivas = [...widgetsAtivos];
+
+      if (CHAVES_DEMOGRAFICAS.includes(perspectivaAtual)) {
+          chavesAtivas = chavesAtivas.filter(k => k !== perspectivaAtual);
+      }
+      
+      if (anoSelecionado === "2026") {
+          const lockKeys = [...CHAVES_CLINICAS, ...CHAVES_CLINICA_FULL];
+          chavesAtivas = chavesAtivas.filter(k => !lockKeys.includes(k));
+      }
+
+      let qtdDemo = chavesAtivas.filter(k => CHAVES_DEMOGRAFICAS.includes(k)).length;
+      contDemo.style.gridTemplateColumns = `repeat(${qtdDemo}, 1fr)`;
+
+      const style = getComputedStyle(document.body);
+
+      const renderizarBloco = (chave, containerDestino, altura) => {
+        if (!chavesAtivas.includes(chave) || !CONFIG_PERSPECTIVAS[chave]) return;
+        
+        const config = CONFIG_PERSPECTIVAS[chave];
+        const canvasId = 'chart-cross-' + chave;
+        
+        const box = document.createElement('div');
+        box.className = 'chart-box cross-chart-box'; 
+        box.style.minHeight = (altura + 60) + 'px';
+        
+        // =======================================================
+        // AQUI ESTÁ A MÁGICA: O JS ESCREVE OS DOIS BOTÕES NA TELA
+        // =======================================================
+        box.innerHTML = `
+          <h4 class="cross-chart-title">${config.titulo}</h4>
+          
+          <div class="view-panel active" id="view-chart-${chave}">
+            <div style="flex:1; position: relative; min-height: ${altura}px;">
+              <canvas id="${canvasId}"></canvas>
+            </div>
+          </div>
+          
+          <div class="view-panel" id="view-table-${chave}" style="overflow-y: auto; min-height: ${altura}px;">
+            <div id="table-container-${chave}"></div>
+          </div>
+
+          <!-- BOTÃO PDF (NOVO - Canto Esquerdo) -->
+          <button class="btn-export-pdf-card" onclick="gerarPDFIndividual('${chave}', '${config.titulo}')" title="Baixar PDF">
+            <i class="fa-solid fa-download"></i>
+          </button>
+
+          <!-- BOTÃO TABELA (Canto Direito) -->
+          <button class="btn-toggle-view-card" onclick="toggleCardView('${chave}')" title="Alternar Tabela/Gráfico">
+            <i class="fa-solid fa-table" id="icon-toggle-${chave}"></i>
+          </button>
+        `;
+        // =======================================================
+
+        containerDestino.appendChild(box);
+
+        let contagem = {};
+        config.categorias.forEach(c => contagem[c.id] = 0);
+        dadosAtivosNoFiltro.forEach(d => { if (contagem[d[config.chave]] !== undefined) contagem[d[config.chave]]++; });
+
+        let dadosAgrupados = [];
+        config.categorias.forEach(c => {
+           if (contagem[c.id] > 0) { 
+             let nomeLimpo = c.nome.split(' (')[0].split('.')[1] ? c.nome.split('.')[1].trim() : c.nome.split(' (')[0];
+             dadosAgrupados.push({ id: c.id, nome: nomeLimpo, qtd: contagem[c.id], cor: obterCorReal(c.hexRef) });
+           }
+        });
+
+        dadosAgrupados.sort((a,b) => b.qtd - a.qtd);
+
+        let dadosParaGrafico = [...dadosAgrupados];
+        if (dadosParaGrafico.length > 15) {
+           let top14 = dadosParaGrafico.slice(0, 14);
+           let resto = dadosParaGrafico.slice(14);
+           let somaResto = resto.reduce((acc, curr) => acc + curr.qtd, 0);
+           if (somaResto > 0) top14.push({ nome: 'Outros', qtd: somaResto, cor: '#94a3b8' });
+           dadosParaGrafico = top14;
+        }
+
+        let totalBloco = dadosAgrupados.reduce((acc, curr) => acc + curr.qtd, 0);
+        let tableHtml = `<table class="data-table-view">
+                          <thead>
+                            <tr><th>Categoria</th><th>Qtd</th><th>%</th></tr>
+                          </thead>
+                          <tbody>`;
+        
+        dadosAgrupados.forEach(item => {
+          let pct = totalBloco > 0 ? ((item.qtd / totalBloco) * 100).toFixed(1) : 0;
+          tableHtml += `<tr>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <div style="width:8px; height:8px; border-radius:50%; background:${item.cor};"></div>
+                ${item.nome}
+              </div>
+            </td>
+            <td style="font-weight:600;">${item.qtd}</td>
+            <td>${pct}%</td>
+          </tr>`;
+        });
+        
+        tableHtml += `<tr class="table-total-row"><td>TOTAL</td><td>${totalBloco}</td><td>100%</td></tr></tbody></table>`;
+        document.getElementById(`table-container-${chave}`).innerHTML = tableHtml;
+
+        new Chart(document.getElementById(canvasId), {
+          type: 'bar',
+          data: {
+            labels: dadosParaGrafico.map(d => d.nome),
+            datasets: [{ data: dadosParaGrafico.map(d => d.qtd), backgroundColor: dadosParaGrafico.map(d => d.cor), borderRadius: 4 }]
+          },
+          options: {
+            maintainAspectRatio: false, indexAxis: 'y', 
+            plugins: {
+              legend: { display: false },
+              datalabels: { color: style.getPropertyValue('--text-main').trim(), anchor: 'end', align: 'right', offset: 2, font: { size: 10, weight: 'bold' } }
+            },
+            scales: {
+              x: { display: false, suggestedMax: Math.max(...dadosParaGrafico.map(d=>d.qtd)) * 1.2 }, 
+              y: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10 }, color: style.getPropertyValue('--text-main').trim() } }
+            },
+            layout: { padding: { right: 20 } }
+          }
+        });
+      };
+
+      CHAVES_DEMOGRAFICAS.forEach(k => renderizarBloco(k, contDemo, 180));
+      CHAVES_CLINICAS.forEach(k => renderizarBloco(k, contClin, 300));
+      CHAVES_CLINICA_FULL.forEach(k => renderizarBloco(k, contTrat, 400));
+    }
+
+    function renderizarGraficoGruposCid() {
+      const box = document.getElementById('box-grupos-cid');
+      const ctx = document.getElementById('chartGruposCids');
+      if(!ctx) return;
+
+      if (perspectivaAtual === 'grupocid') {
+         box.style.display = 'none';
+         return;
+      }
+      
+      if(dadosAtivosNoFiltro.length === 0) {
+          if(charts.gruposCid) charts.gruposCid.destroy();
+          return;
+      }
+
+      let contagem = {};
+      const categoriasOficiais = CONFIG_PERSPECTIVAS['grupocid'].categorias;
+      categoriasOficiais.forEach(c => contagem[c.id] = 0);
+      
+      dadosAtivosNoFiltro.forEach(d => {
+        if(contagem[d.cat_grupocid] !== undefined) contagem[d.cat_grupocid]++;
+      });
+
+      let dadosFiltrados = categoriasOficiais
+        .map(c => ({ nome: c.nome, qtd: contagem[c.id], cor: obterCorReal(c.hexRef) }))
+        .filter(i => i.qtd > 0)
+        .sort((a, b) => b.qtd - a.qtd);
+
+      // =========================================================================
+      // GERAÇÃO DA TABELA - GRUPOS CID
+      // =========================================================================
+      let totalBloco = dadosFiltrados.reduce((acc, curr) => acc + curr.qtd, 0);
+      let tableHtml = `<table class="data-table-view">
+                        <thead><tr><th>Grupo Topográfico (CID)</th><th>Qtd</th><th>%</th></tr></thead>
+                        <tbody>`;
+      
+      dadosFiltrados.forEach(item => {
+        let pct = totalBloco > 0 ? ((item.qtd / totalBloco) * 100).toFixed(1) : 0;
+        tableHtml += `<tr>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:${item.cor};"></div>
+              ${item.nome}
+            </div>
+          </td>
+          <td style="font-weight:600;">${item.qtd}</td>
+          <td>${pct}%</td>
+        </tr>`;
+      });
+      tableHtml += `<tr class="table-total-row"><td>TOTAL</td><td>${totalBloco}</td><td>100%</td></tr></tbody></table>`;
+      
+      let tableContainer = document.getElementById('table-container-grupocid_large');
+      if(tableContainer) tableContainer.innerHTML = tableHtml;
+      // =========================================================================
+
+      if(charts.gruposCid) charts.gruposCid.destroy();
+
+      const style = getComputedStyle(document.body);
+      charts.gruposCid = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: dadosFiltrados.map(d => d.nome),
+          datasets: [{ 
+            data: dadosFiltrados.map(d => d.qtd), 
+            backgroundColor: dadosFiltrados.map(d => d.cor),
+            borderRadius: 4
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          indexAxis: 'y', 
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              color: '#ffffff', backgroundColor: 'rgba(15, 23, 42, 0.7)',
+              borderRadius: 3, anchor: 'end', align: 'start', offset: 5,
+              font: { size: 11, weight: 'bold' }
+            }
+          },
+          scales: {
+            x: { display: false, beginAtZero: true, suggestedMax: Math.max(...dadosFiltrados.map(d=>d.qtd)) * 1.15 },
+            y: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: style.getPropertyValue('--text-main').trim() } }
+          },
+          layout: { padding: { right: 40 } }
+        }
+      });
+    }
+
+    function renderizarGraficoCids() {
+      const limite = parseInt(document.getElementById('seletor-top-cid').value);
+      const style = getComputedStyle(document.body);
+      const corBarra = style.getPropertyValue('--accent').trim();
+
+      if(charts.topCid) charts.topCid.destroy();
+      const ctx = document.getElementById('chartTopCids');
+      if(!ctx || dadosAtivosNoFiltro.length === 0) return;
+
+      let contagemCid = {};
+      dadosAtivosNoFiltro.forEach(d => {
+        let c = d.cid;
+        if(!contagemCid[c]) contagemCid[c] = 0;
+        contagemCid[c]++;
+      });
+
+      // Pega todos os CIDs, ordena e separa o "Top X" para o gráfico
+      let arrayCidsTotal = Object.keys(contagemCid)
+        .map(c => ({ nome: c, qtd: contagemCid[c] }))
+        .sort((a, b) => b.qtd - a.qtd);
+        
+      let arrayCidsGrafico = arrayCidsTotal.slice(0, limite);
+
+      // =========================================================================
+      // GERAÇÃO DA TABELA - TODOS OS CIDS (Audit View)
+      // =========================================================================
+      let totalGeralCids = arrayCidsTotal.reduce((acc, curr) => acc + curr.qtd, 0);
+      let tableHtml = `<table class="data-table-view">
+                        <thead><tr><th>Código CID Oficial</th><th>Quantidade de Pacientes</th><th>% (Do Total Filtrado)</th></tr></thead>
+                        <tbody>`;
+      
+      arrayCidsTotal.forEach(item => {
+        let pct = totalGeralCids > 0 ? ((item.qtd / totalGeralCids) * 100).toFixed(1) : 0;
+        tableHtml += `<tr>
+          <td><strong style="color:var(--accent);">${item.nome}</strong></td>
+          <td style="font-weight:600;">${item.qtd}</td>
+          <td>${pct}%</td>
+        </tr>`;
+      });
+      tableHtml += `<tr class="table-total-row"><td>TOTAL</td><td>${totalGeralCids}</td><td>100%</td></tr></tbody></table>`;
+      
+      let tableContainer = document.getElementById('table-container-topcid');
+      if(tableContainer) tableContainer.innerHTML = tableHtml;
+      // =========================================================================
+
+      ctx.parentElement.style.height = (Math.max(400, limite * 25)) + 'px';
+
+      charts.topCid = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: arrayCidsGrafico.map(a => a.nome),
+          datasets: [{ data: arrayCidsGrafico.map(a => a.qtd), backgroundColor: corBarra, borderRadius: 4 }]
+        },
+        options: {
+          maintainAspectRatio: false, indexAxis: 'y', 
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              color: '#ffffff', backgroundColor: 'rgba(15, 23, 42, 0.7)',
+              borderRadius: 3, anchor: 'end', align: 'start', offset: 5,
+              font: { size: 11, weight: 'bold' }
+            }
+          },
+          scales: {
+            x: { display: false, beginAtZero: true, suggestedMax: Math.max(...arrayCidsGrafico.map(d=>d.qtd)) * 1.15 },
+            y: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: style.getPropertyValue('--text-main').trim() } }
+          },
+          layout: { padding: { right: 40 } }
+        }
+      });
+    }
+
+    function renderProporcionalidade(componentesGlobais, totalFiltrado, componentesSel, mesesSel, evolucao, qtdGlobalPorCat, qtdMensalGlobalPorCat, totalPerfil, configAtual) {
+      const container = document.getElementById('container-proporcionalidade');
+      let html = '';
+
+      if(totalPerfil === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">Nenhum dado encontrado.</div>';
+        return;
+      }
+
+      let listaGeral = [];
+      let listaSelecionada = [];
+
+      configAtual.forEach(c => {
+          let corHex = obterCorReal(c.hexRef);
+          listaGeral.push({ nome: c.nome, qtd: qtdGlobalPorCat[c.id], cor: corHex });
+          if(componentesSel.includes(c.id)) {
+              listaSelecionada.push({ nome: c.nome, qtd: componentesGlobais[c.id], cor: corHex });
+          }
+      });
+
+      listaGeral.sort((a,b) => b.qtd - a.qtd);
+      listaSelecionada.sort((a,b) => b.qtd - a.qtd);
+
+      html += gerarBlocoProp(
+          "Cenário Global (Demografia)", `Proporção considerando <strong>todos os ${totalPerfil} pacientes</strong> do perfil.`, listaGeral, totalPerfil,
+          "Seleção Ativa ("+CONFIG_PERSPECTIVAS[perspectivaAtual].titulo+")", `Proporção considerando <strong>apenas os ${totalFiltrado} pacientes</strong> filtrados.`, listaSelecionada, totalFiltrado
+      );
+
+      if (mesesSel.length > 0) {
+          html += `<div style="margin-top: 40px; margin-bottom: 10px;">
+                      <h4 style="border-bottom: 2px dashed var(--border); padding-bottom: 10px; color: var(--text-main); font-size: 15px;">
+                          <i class="fa-regular fa-calendar-days"></i> Análise Isolada por Mês/Aba
+                      </h4>
+                   </div>`;
+
+          mesesSel.sort(ordemAnoRHC).forEach(mes => {
+              let listaGeralMes = [];
+              let listaSelMes = [];
+              let totalGeralMes = 0;
+              let totalSelMes = 0;
+
+              configAtual.forEach(c => {
+                  let corHex = obterCorReal(c.hexRef);
+                  let qtdC = qtdMensalGlobalPorCat[mes] ? qtdMensalGlobalPorCat[mes][c.id] : 0;
+                  totalGeralMes += qtdC;
+                  listaGeralMes.push({ nome: c.nome, qtd: qtdC, cor: corHex });
+
+                  if(componentesSel.includes(c.id)) {
+                      let qtdFiltro = evolucao[mes] ? evolucao[mes][c.id] : 0;
+                      totalSelMes += qtdFiltro;
+                      listaSelMes.push({ nome: c.nome, qtd: qtdFiltro, cor: corHex });
+                  }
+              });
+
+              listaGeralMes.sort((a,b) => b.qtd - a.qtd);
+              listaSelMes.sort((a,b) => b.qtd - a.qtd);
+
+              html += `<div style="margin-top: 25px; margin-bottom: -5px; font-weight: 800; font-size: 13px; color: var(--text-muted); text-transform: uppercase;">Mês Base: ${mes}</div>`;
+              html += gerarBlocoProp(
+                  `Global (${mes})`, `<strong>${totalGeralMes} pac.</strong> neste perfil.`, listaGeralMes, totalGeralMes,
+                  `Selecionadas (${mes})`, `<strong>${totalSelMes} pac.</strong> filtrados neste mês.`, listaSelMes, totalSelMes
+              );
+          });
+      }
+      container.innerHTML = html;
+    }
+
+    function renderGraficos(evolucao, mesesSel, componentesSel, configAtual) {
+      const mesesLabels = mesesSel.sort(ordemAnoRHC);
+      const style = getComputedStyle(document.body);
+      
+      Chart.defaults.color = style.getPropertyValue('--text-muted').trim(); 
+      Chart.defaults.font.family = 'Inter'; 
+      Chart.defaults.borderColor = style.getPropertyValue('--border').trim();
+
+      let isBar = (modoEvolucao === 'barras');
+      let isPct = (modoEvolucao === 'porcentagem');
+      let dataSeries = [];
+
+      configAtual.forEach(c => {
+        if(componentesSel.includes(c.id)) {
+          let corHex = obterCorReal(c.hexRef);
+          let dataPoints = mesesLabels.map(m => {
+            let valor = evolucao[m][c.id];
+            if (isPct) {
+              let totalMes = Object.values(evolucao[m]).reduce((a, b) => a + b, 0);
+              return totalMes > 0 ? parseFloat(((valor / totalMes) * 100).toFixed(1)) : 0;
+            }
+            return valor;
+          });
+
+          if (isBar) {
+            dataSeries.push({ label: c.nome, data: dataPoints, backgroundColor: corHex, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' });
+          } else {
+            dataSeries.push({ label: c.nome, data: dataPoints, borderColor: corHex, backgroundColor: corHex, tension: 0.4, fill: false, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6 });
+          }
+        }
+      });
+
+      // =========================================================================
+      // GERAÇÃO DA TABELA DA SÉRIE HISTÓRICA (EVOLUÇÃO)
+      // =========================================================================
+      let tableHtml = `<table class="data-table-view"><thead><tr><th>Período</th>`;
+      let catsAtivas = configAtual.filter(c => componentesSel.includes(c.id));
+      
+      // Monta os cabeçalhos das colunas
+      catsAtivas.forEach(c => tableHtml += `<th>${c.nome}</th>`);
+      tableHtml += `<th>Total</th></tr></thead><tbody>`;
+
+      // Monta as linhas para cada mês
+      mesesLabels.forEach(m => {
+        tableHtml += `<tr><td><b>${m}</b></td>`;
+        let somaLinha = 0;
+        
+        catsAtivas.forEach(c => {
+          let v = evolucao[m][c.id] || 0;
+          tableHtml += `<td>${v}</td>`;
+          somaLinha += v;
+        });
+        
+        tableHtml += `<td class="table-total-row">${somaLinha}</td></tr>`;
+      });
+      
+      tableHtml += `</tbody></table>`;
+      document.getElementById('table-container-evolucao').innerHTML = tableHtml;
+      // =========================================================================
+
+      if(charts.linhas) charts.linhas.destroy();
+      const ctx = document.getElementById('chartLinhas');
+      if(!ctx) return;
+
+      charts.linhas = new Chart(ctx, {
+        type: isBar ? 'bar' : 'line', 
+        data: { labels: mesesLabels, datasets: dataSeries },
+        options: { 
+          maintainAspectRatio: false, layout: { padding: { top: 30 } },
+          animation: { duration: 1000, easing: 'easeOutQuart' },
+          interaction: { mode: 'index', intersect: false },
+          plugins: { 
+            legend: { position: 'bottom' },
+            datalabels: {
+              color: '#ffffff', backgroundColor: isBar ? 'rgba(15, 23, 42, 0.4)' : 'rgba(15, 23, 42, 0.85)',
+              borderRadius: 4, font: { size: 10, family: 'Inter', weight: 'bold' },
+              formatter: (value) => {
+                  if (value === 0) return null; 
+                  return isPct ? Math.round(value) + '%' : value;
+              },
+              align: isBar ? 'center' : 'top', padding: 4
+            }
+          },
+          scales: { 
+            x: { stacked: isBar },
+            y: { beginAtZero: true, stacked: isBar, ticks: { callback: (v) => isPct ? v + '%' : v } } 
+          }
+        }
+      });
+    }
+
+    function iniciarCarrosselRadar(evolucao, mesesSel, componentesSel, configAtual) {
+      if(carrosselTimer) clearInterval(carrosselTimer);
+      const dotsContainer = document.getElementById('radar-dots');
+
+      if(mesesSel.length === 0) {
+         document.getElementById('radar-mes-ativo').innerText = "Nenhum";
+         if(charts.radar) charts.radar.destroy();
+         if(dotsContainer) dotsContainer.innerHTML = '';
+         document.getElementById('table-container-radar').innerHTML = '';
+         return;
+      }
+
+      const mesesAptos = mesesSel.sort(ordemAnoRHC);
+      let idx = 0;
+      
+      if(dotsContainer) {
+        dotsContainer.innerHTML = '';
+        mesesAptos.forEach((_, i) => { dotsContainer.innerHTML += `<div class="radar-dot" id="dot-${i}"></div>`; });
+      }
+
+      function girarRadar() {
+        let mes = mesesAptos[idx];
+        document.getElementById('radar-mes-ativo').innerText = mes;
+        document.querySelectorAll('.radar-dot').forEach((d, i) => { d.classList.toggle('active', i === idx); });
+        
+        let rotativoLabels = [];
+        let rotativoData = [];
+        let rotativoCores = [];
+
+        configAtual.forEach(c => {
+          if(componentesSel.includes(c.id)) {
+            rotativoLabels.push(c.nome);
+            rotativoData.push(evolucao[mes] ? evolucao[mes][c.id] : 0);
+            rotativoCores.push(obterCorReal(c.hexRef));
+          }
+        });
+
+        // ==========================================
+        // INÍCIO DA GERAÇÃO DA TABELA DO RADAR
+        // ==========================================
+        let tableHtml = `<table class="data-table-view"><thead><tr><th>Categoria</th><th>Qtd</th><th>%</th></tr></thead><tbody>`;
+        let totalMês = rotativoData.reduce((a, b) => a + b, 0);
+
+        rotativoLabels.forEach((lab, i) => {
+          let pct = totalMês > 0 ? ((rotativoData[i] / totalMês) * 100).toFixed(1) : 0;
+          tableHtml += `<tr>
+            <td><i class="fa-solid fa-circle" style="color:${rotativoCores[i]}; font-size:8px;"></i> ${lab}</td>
+            <td>${rotativoData[i]}</td>
+            <td>${pct}%</td>
+          </tr>`;
+        });
+        tableHtml += `<tr class="table-total-row"><td>TOTAL</td><td>${totalMês}</td><td>100%</td></tr></tbody></table>`;
+        document.getElementById('table-container-radar').innerHTML = tableHtml;
+        // ==========================================
+
+        if(charts.radar) charts.radar.destroy();
+        charts.radar = new Chart(document.getElementById('chartRotativo'), {
+          type: 'doughnut',
+          data: { labels: rotativoLabels, datasets: [{ data: rotativoData, backgroundColor: rotativoCores, borderWidth: 0 }] },
+          options: { 
+            maintainAspectRatio: false, cutout: '50%', animation: { duration: 800 }, 
+            plugins: { 
+              legend: { position: 'right' },
+              datalabels: {
+                color: '#ffffff', backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                borderRadius: 4, font: { size: 11, family: 'Inter', weight: 'bold' },
+                formatter: (value, ctx) => {
+                    if(value === 0) return null;
+                    let sum = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                    let pct = sum > 0 ? ((value / sum) * 100).toFixed(1) + '%' : '';
+                    return `${value}\n(${pct})`;
+                },
+                textAlign: 'center'
+              }
+            } 
+          }
+        });
+
+        idx = (idx + 1) % mesesAptos.length;
+      }
+
+      girarRadar();
+      carrosselTimer = setInterval(girarRadar, 4000);
+    }
+
+    // =========================================================================
+    // 9. MODAL DE CONFIGURAÇÕES E ESTÚDIO DE WIREFRAMES
+    // =========================================================================
+    function gerenciarVisibilidadeTelas() {
+      // CORREÇÃO: Adicionado o "else" (o '') para voltar a mostrar os elementos
+      const visEvolucao = widgetsAtivos.includes('evolucao');
+      const contSup = document.getElementById('container-graficos-superiores');
+      if (contSup) contSup.style.display = visEvolucao ? '' : 'none';
+
+      const boxProp = document.getElementById('box-proporcionalidade');
+      if (boxProp) boxProp.style.display = widgetsAtivos.includes('proporcionalidade') ? 'flex' : 'none';
+
+      const boxGcid = document.getElementById('box-grupos-cid');
+      if (boxGcid) boxGcid.style.display = (widgetsAtivos.includes('grupocid_large') && perspectivaAtual !== 'grupocid') ? 'block' : 'none';
+
+      const boxTcid = document.getElementById('box-top-cids');
+      if (boxTcid) boxTcid.style.display = widgetsAtivos.includes('topcid') ? 'block' : 'none';
+    }
+
+    function abrirConfigWidgets() {
+      const lista = document.getElementById('lista-widgets');
+      lista.innerHTML = '';
+      
+      const gerarBloco = (chave, titulo) => {
+         if (chave === perspectivaAtual) return ''; 
+         const isChecked = widgetsAtivos.includes(chave);
+         const checkedClass = isChecked ? 'selected' : '';
+         const checkedAttr = isChecked ? 'checked' : '';
+
+         // NOVA LÓGICA DE BADGES (Etiquetas)
+         const badgeText = isChecked ? '<i class="fa-solid fa-eye"></i> Visível' : '<i class="fa-solid fa-eye-slash"></i> Oculto';
+         const badgeClass = isChecked ? 'badge-visivel' : 'badge-oculto';
+
+         let barrasFakeHtml = '';
+         const larguras = [85, 65, 45, 30, 15];
+         
+         if (CONFIG_PERSPECTIVAS[chave]) {
+             const config = CONFIG_PERSPECTIVAS[chave];
+             const numBarras = Math.min(5, config.categorias.length);
+             for(let i=0; i<numBarras; i++) {
+                 let cor = config.categorias[i].hexRef;
+                 let corReal = cor.startsWith('var') ? cor : cor; 
+                 barrasFakeHtml += `
+                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                      <div style="width: 15%; height: 4px; background: var(--border); border-radius: 2px; opacity: 0.6;"></div>
+                      <div style="width: ${larguras[i]}%; height: 8px; background: ${corReal}; border-radius: 3px;"></div>
+                   </div>`;
+             }
+         } else {
+             for(let i=0; i<3; i++) {
+                 barrasFakeHtml += `
+                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                      <div style="width: 15%; height: 4px; background: var(--border); border-radius: 2px; opacity: 0.6;"></div>
+                      <div style="width: ${larguras[i]}%; height: 8px; background: var(--accent); border-radius: 3px;"></div>
+                   </div>`;
+             }
+         }
+
+         return `
+          <div class="widget-preview-card ${checkedClass}" onclick="toggleWidgetCard(this, '${chave}')">
+            <div class="${badgeClass}" id="badge-${chave}">${badgeText}</div>
+            <div class="widget-preview-title" style="margin-bottom: 10px;">${titulo}</div>
+            <div style="width: 100%; display: flex; flex-direction: column; justify-content: center; padding: 0 10px;">
+               ${barrasFakeHtml}
+            </div>
+            <input type="checkbox" id="chk-widget-${chave}" value="${chave}" class="widget-checkbox" ${checkedAttr}>
+          </div>`;
+      };
+
+      lista.innerHTML += `<div class="modal-row" style="margin-bottom: 20px;"><div style="flex: 3;">${gerarBloco('evolucao', 'Série Histórica e Radar (Módulo Fixo)')}</div></div>`;
+
+      let htmlDemo = '';
+      CHAVES_DEMOGRAFICAS.forEach(k => htmlDemo += gerarBloco(k, CONFIG_PERSPECTIVAS[k].titulo));
+      lista.innerHTML += `<div class="modal-row grid-5" style="margin-bottom: 20px;">${htmlDemo}</div>`;
+
+      let htmlClin = '';
+      CHAVES_CLINICAS.forEach(k => htmlClin += gerarBloco(k, CONFIG_PERSPECTIVAS[k].titulo));
+      lista.innerHTML += `<div class="modal-row grid-4" style="margin-bottom: 20px;">${htmlClin}</div>`;
+
+      // Linha 4: Clínica Trat (Largura Total)
+      lista.innerHTML += `<div style="width: 100%; margin-bottom: 10px;">${gerarBloco('clinicaTrat', 'Clínica (Início do Tratamento)')}</div>`;
+
+      // Linha 5: Proporcionalidade (Largura Total)
+      lista.innerHTML += `<div style="width: 100%; margin-bottom: 10px;">${gerarBloco('proporcionalidade', 'Análise de Proporcionalidade Demográfica')}</div>`;
+
+      // Linha 6: Distribuição por Grupos (Largura Total)
+      lista.innerHTML += `<div style="width: 100%; margin-bottom: 10px;">${gerarBloco('grupocid_large', 'Distribuição por Grupos Topográficos')}</div>`;
+
+      // Linha 7: Principais Diagnósticos (Largura Total)
+      lista.innerHTML += `<div style="width: 100%; margin-bottom: 10px;">${gerarBloco('topcid', 'Principais Diagnósticos (CIDs) da Base Filtrada')}</div>`;
+      
+      document.getElementById('modal-widgets').style.display = 'flex';
+    }
+
+    function toggleWidgetCard(cardElement, key) {
+        const checkbox = document.getElementById(`chk-widget-${key}`);
+        const badge = document.getElementById(`badge-${key}`);
+        
+        checkbox.checked = !checkbox.checked;
+        if(checkbox.checked) {
+            cardElement.classList.add('selected');
+            badge.className = 'badge-visivel';
+            badge.innerHTML = '<i class="fa-solid fa-eye"></i> Visível';
+        } else {
+            cardElement.classList.remove('selected');
+            badge.className = 'badge-oculto';
+            badge.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Oculto';
+        }
+    }
+
+    function fecharConfigWidgets() {
+      document.getElementById('modal-widgets').style.display = 'none';
+    }
+
+    function salvarConfigWidgets() {
+      const selecionados = Array.from(document.querySelectorAll('.widget-checkbox:checked')).map(cb => cb.value);
+      widgetsAtivos = selecionados;
+      localStorage.setItem('rhc_widgets_ativos', JSON.stringify(widgetsAtivos));
+      fecharConfigWidgets();
+      aplicarFiltrosLocais();
+    }
+
+    function alternarTodosWidgets(mostrar) {
+        const checkboxes = document.querySelectorAll('.widget-checkbox');
+        
+        checkboxes.forEach(chk => {
+            chk.checked = mostrar;
+            const cardElement = chk.closest('.widget-preview-card');
+            const key = chk.value;
+            const badge = document.getElementById(`badge-${key}`);
+            
+            if(mostrar) {
+                cardElement.classList.add('selected');
+                if(badge) {
+                    badge.className = 'badge-visivel';
+                    badge.innerHTML = '<i class="fa-solid fa-eye"></i> Visível';
+                }
+            } else {
+                cardElement.classList.remove('selected');
+                if(badge) {
+                    badge.className = 'badge-oculto';
+                    badge.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Oculto';
+                }
+            }
+        });
+    }
+
+    function marcarTodosFiltrosSidebar(estado) {
+      // Lista todos os grupos de filtros que temos na sidebar
+      const grupos = ['grupocid', 'cores', 'idade', 'sexo', 'etnia', 'diagtrat', 'obito'];
+      
+      grupos.forEach(grupo => {
+        const checkboxes = document.querySelectorAll(`.chk-sec-${grupo}`);
+        checkboxes.forEach(cb => {
+          cb.checked = estado;
+        });
+      });
+      
+      // Rodamos a atualização da tela
+      console.log(`[Sidebar] Filtros secundários: ${estado ? 'Todos marcados' : 'Todos limpos'}`);
+      aplicarFiltrosLocais();
+    }
+
+    function classificarGrupoCID_Tipo2(cidBruto) {
+      if (!cidBruto) return 'OUTROS';
+      let match = cidBruto.match(/[C](\d{2})/i); 
+      if (!match) return 'OUTROS';
+      let num = parseInt(match[1], 10);
+      if (num >= 0 && num <= 14) return 'C00-C14';
+      if (num === 15) return 'C15';
+      if (num === 16) return 'C16';
+      if (num === 18) return 'C18';
+      if (num >= 19 && num <= 21) return 'C19-C21';
+      if (num === 22) return 'C22';
+      if (num === 25) return 'C25';
+      if ([17, 23, 24, 26].includes(num)) return 'C17_23_24_26';
+      if (num === 32) return 'C32';
+      if (num === 33 || num === 34) return 'C33-C34';
+      if ([30, 31, 37, 39].includes(num)) return 'C30_31_37_39';
+      if (num === 40 || num === 41) return 'C40-C41';
+      if (num === 43) return 'C43';
+      if (num === 44) return 'C44';
+      if (num >= 45 && num <= 49) return 'C45-C49';
+      if (num === 50) return 'C50';
+      if (num === 53) return 'C53';
+      if (num === 54 || num === 55) return 'C54-C55';
+      if ([51, 52, 56, 57, 58].includes(num)) return 'C51_52_56_58';
+      if (num === 61) return 'C61';
+      if ([60, 62, 63].includes(num)) return 'C60_62_63';
+      if (num === 67) return 'C67';
+      if ([64, 65, 66, 68].includes(num)) return 'C64_66_68';
+      if (num === 69) return 'C69';
+      if (num === 71) return 'C71';
+      if (num === 70 || num === 72) return 'C70_72';
+      if ((num >= 73 && num <= 80) || num === 97) return 'C73-C80_C97';
+      if (num === 81) return 'C81';
+      if (num >= 82 && num <= 85) return 'C82-C85';
+      if (num >= 91 && num <= 95) return 'C91-C95';
+      if ([88, 89, 90, 96].includes(num)) return 'C88_90_96';
+      return 'OUTROS';
+    }
+
+    function abrirModalSelecaoCids() {
+      const cidsDisp = [...new Set(rawData.map(d => d.cid))].filter(Boolean).sort();
+      let html = `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; max-height:400px; overflow-y:auto; padding:10px; background:rgba(0,0,0,0.05); border-radius:8px;">`;
+      
+      cidsDisp.forEach(cid => {
+        const isChecked = CONFIG_PERSPECTIVAS.especifico.categorias.some(c => c.id === cid) ? 'checked' : '';
+        html += `<label class="check-item" style="font-size:10px;"><input type="checkbox" class="chk-cid-selecao" value="${cid}" ${isChecked}> ${cid}</label>`;
+      });
+      html += `</div>`;
+
+      const lista = document.getElementById('lista-widgets');
+      lista.innerHTML = `<h4 style="margin-top:0; color:var(--text-main);">Selecione até 10 CIDs para monitoramento clínico:</h4>${html}`;
+      
+      const btnSalvar = document.querySelector('#modal-widgets button[onclick="salvarConfigWidgets()"]');
+      const originalFunc = btnSalvar.onclick;
+      
+      btnSalvar.onclick = function() {
+        const sel = Array.from(document.querySelectorAll('.chk-cid-selecao:checked')).map(cb => cb.value);
+        if (sel.length > 10) return alert("Máximo de 10 CIDs permitido.");
+        
+        const cores = ['#38bdf8', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#3b82f6', '#14b8a6', '#f43f5e', '#64748b'];
+        CONFIG_PERSPECTIVAS.especifico.categorias = sel.map((cid, i) => ({ id: cid, nome: cid, hexRef: cores[i] }));
+        
+        btnSalvar.onclick = originalFunc;
+        fecharConfigWidgets();
+        mudarSubPerspectivaCid();
+      };
+      
+      document.getElementById('modal-widgets').style.display = 'flex';
+    }
+
+    function toggleCardView(cardName) {
+  const vChart = document.getElementById(`view-chart-${cardName}`);
+  const vTable = document.getElementById(`view-table-${cardName}`);
+  const icon = document.getElementById(`icon-toggle-${cardName}`);
+  
+  if (vChart.classList.contains('active')) {
+    vChart.classList.remove('active');
+    vTable.classList.add('active');
+    icon.classList.replace('fa-table', 'fa-chart-pie');
+  } else {
+    vTable.classList.remove('active');
+    vChart.classList.add('active');
+    icon.classList.replace('fa-chart-pie', 'fa-table');
+  }
+}
+
+// =========================================================================
+// 10. MOTOR DE PREVIEW E EXPORTAÇÃO PDF (DASHBOARD PRINCIPAL)
+// =========================================================================
+
+function gerarCabecalhoRelatorioPDF() {
+  const dataAtual = new Date();
+  const dataFormatada = dataAtual.toLocaleDateString('pt-BR') + ' às ' + dataAtual.toLocaleTimeString('pt-BR');
+  const periodoStr = document.getElementById('header-periodo-rhc').innerText;
+  const totalPac = document.getElementById('header-total-pacientes').innerText;
+  const visaoAtiva = document.getElementById('select-perspectiva').options[document.getElementById('select-perspectiva').selectedIndex].text;
+
+  return `
+    <div style="border-bottom: 3px solid #1e293b; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+      <div>
+        <h1 style="margin: 0 0 5px 0; font-size: 22px; color: #1e293b; text-transform: uppercase; font-weight: 900;">Hospital de Clínicas de Porto Alegre</h1>
+        <h2 style="margin: 0; font-size: 14px; color: #475569; font-weight: 600;">Relatório de Inteligência RHC (Proporcionalidade)</h2>
+      </div>
+      <div style="text-align: right; font-size: 11px; color: #64748b;">
+        <div><strong>Gerado em:</strong> ${dataFormatada}</div>
+        <div><strong>Período Analisado:</strong> ${periodoStr}</div>
+        <div><strong>Amostra Filtrada:</strong> ${totalPac} pacientes</div>
+        <div><strong>Perspectiva Base:</strong> ${visaoAtiva}</div>
+      </div>
+    </div>
+  `;
+}
+
+async function prepararElementoParaPDF(containerOrigemId) {
+  let origem = document.getElementById(containerOrigemId);
+  if (!origem) origem = document.getElementById('chart-cross-' + containerOrigemId)?.closest('.chart-box');
+  if (!origem) return "";
+
+  const clone = origem.cloneNode(true);
+  clone.classList.add('pdf-export-mode');
+  
+  const isMetadeDaTela = origem.classList.contains('cross-chart-box') || containerOrigemId === 'box-radar';
+  clone.style.width = isMetadeDaTela ? 'calc(50% - 7.5mm)' : '100%';
+  clone.style.display = 'block';
+
+  const paineisInativos = clone.querySelectorAll('.view-panel:not(.active)');
+  paineisInativos.forEach(p => p.style.display = 'none');
+  const paineisAtivos = clone.querySelectorAll('.view-panel.active');
+  paineisAtivos.forEach(p => p.style.display = 'block');
+
+  const canvasesOriginais = origem.querySelectorAll('canvas');
+  const canvasesClonados = clone.querySelectorAll('canvas');
+  
+  for (let i = 0; i < canvasesOriginais.length; i++) {
+    if (canvasesOriginais[i].clientWidth > 0 && canvasesOriginais[i].clientHeight > 0) {
+        const imagemUrl = canvasesOriginais[i].toDataURL('image/png', 1.0);
+        const img = document.createElement('img');
+        img.src = imagemUrl;
+        img.style.width = '100%';
+        img.style.maxHeight = '280px'; 
+        img.style.objectFit = 'contain'; 
+        img.style.display = 'block';
+        img.style.margin = '0 auto';
+        if (canvasesClonados[i] && canvasesClonados[i].parentNode) {
+            canvasesClonados[i].parentNode.replaceChild(img, canvasesClonados[i]);
+        }
+    }
+  }
+  return clone.outerHTML;
+}
+
+async function gerarPDFIndividual(id, titulo) {
+  document.getElementById('loader').style.display = 'flex';
+  document.getElementById('loader-msg').innerText = "Construindo documento para exportação...";
+
+  const previewContainer = document.getElementById('pdf-preview-content');
+  if(!previewContainer) {
+      alert("Aviso: O container de preview não foi encontrado no HTML.");
+      document.getElementById('loader').style.display = 'none';
+      return;
+  }
+  
+  let htmlPagina = gerarCabecalhoRelatorioPDF();
+  let htmlModulo = await prepararElementoParaPDF(id);
+  
+  htmlModulo = htmlModulo.replace('width: calc(50% - 7.5mm);', 'width: 100%;'); 
+  htmlPagina += `<div class="pdf-grid-row"><div class="pdf-item-full">${htmlModulo}</div></div>`;
+
+  previewContainer.innerHTML = `<div class="a4-landscape-page">${htmlPagina}</div>`;
+  
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('modal-pdf-preview').style.display = 'block';
+}
+
+function abrirModalRelatorioPDF() {
+  const lista = document.getElementById('lista-opcoes-pdf');
+  if(!lista) {
+      alert("Para gerar o relatório completo, a estrutura do modal de PDF precisa estar no HTML.");
+      return;
+  }
+  lista.innerHTML = '';
+  const caixas = document.querySelectorAll('.chart-box');
+  caixas.forEach(caixa => {
+    // Ignoramos a box de proporcionalidade para não bugar a quebra de página
+    if (caixa.style.display !== 'none' && caixa.id && !caixa.id.includes('box-proporcionalidade')) {
+      const titulo = caixa.querySelector('.chart-title span')?.innerText || caixa.id;
+      lista.innerHTML += `<label class="check-item" style="border-color: rgba(255,255,255,0.2);"><input type="checkbox" class="chk-pdf-module" value="${caixa.id}" checked> <span style="color:var(--text-main);">${titulo}</span></label>`;
+    }
+  });
+  document.getElementById('modal-export-pdf').style.display = 'flex';
+}
+
+function fecharModalPDF() {
+  const mod = document.getElementById('modal-export-pdf');
+  if(mod) mod.style.display = 'none';
+}
+
+async function gerarPreviewPDF() {
+  const modulos = Array.from(document.querySelectorAll('.chk-pdf-module:checked')).map(cb => cb.value);
+  if(modulos.length === 0) return alert("Selecione um módulo.");
+
+  fecharModalPDF();
+  document.getElementById('loader').style.display = 'flex';
+  document.getElementById('loader-msg').innerText = "Compilando relatório estruturado...";
+
+  const previewContainer = document.getElementById('pdf-preview-content');
+  previewContainer.innerHTML = ''; 
+
+  const MAX_ALTURA_FOLHA = 680; 
+  let alturaAtual = 120; 
+  let htmlPaginaAtual = gerarCabecalhoRelatorioPDF();
+  let paginasProntasHTML = '';
+
+  const largos = [];
+  const curtos = [];
+  for (let id of modulos) {
+     if (['box-evolucao', 'box-grupos-cid', 'box-top-cids'].includes(id)) {
+         largos.push(id);
+     } else {
+         curtos.push(id);
+     }
+  }
+
+  function quebrarPagina() {
+     paginasProntasHTML += `<div class="a4-landscape-page">${htmlPaginaAtual}</div>`;
+     htmlPaginaAtual = ''; 
+     alturaAtual = 0;      
+  }
+
+  for (let id of largos) {
+     let alturaBloco = 380;
+     if (alturaAtual + alturaBloco > MAX_ALTURA_FOLHA && alturaAtual > 0) quebrarPagina();
+     let html = await prepararElementoParaPDF(id);
+     htmlPaginaAtual += `<div class="pdf-grid-row"><div class="pdf-item-full">${html}</div></div>`;
+     alturaAtual += alturaBloco;
+  }
+
+  for (let i = 0; i < curtos.length; i += 2) {
+     if (alturaAtual + 350 > MAX_ALTURA_FOLHA && alturaAtual > 0) quebrarPagina();
+     let html1 = await prepararElementoParaPDF(curtos[i]);
+     let html2 = curtos[i+1] ? await prepararElementoParaPDF(curtos[i+1]) : '';
+     htmlPaginaAtual += `<div class="pdf-grid-row">
+                           <div class="pdf-item-half">${html1}</div>
+                           ${html2 ? `<div class="pdf-item-half">${html2}</div>` : ''}
+                         </div>`;
+     alturaAtual += 350;
+  }
+
+  if (htmlPaginaAtual !== '') {
+      htmlPaginaAtual += `<div style="text-align:center; font-size:10px; margin-top:20px; color:#94a3b8; border-top:1px solid #e2e8f0; padding-top:10px;">Fim do Relatório Oficial HCPA</div>`;
+      paginasProntasHTML += `<div class="a4-landscape-page">${htmlPaginaAtual}</div>`;
+  }
+
+  previewContainer.innerHTML = paginasProntasHTML;
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('modal-pdf-preview').style.display = 'block';
+}
+
+function fecharPreview() {
+  const mod = document.getElementById('modal-pdf-preview');
+  if(mod) mod.style.display = 'none';
+  document.getElementById('pdf-preview-content').innerHTML = '';
+}
+
+function salvarComoPDF() {
+  const element = document.getElementById('pdf-preview-content');
+  const opt = {
+    margin: 0, 
+    filename: `RHC_Relatorio_Painel_${new Date().getTime()}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['css', 'legacy'] } 
+  };
+  html2pdf().set(opt).from(element).save();
+}
+
+function imprimirRelatorio() {
+  const content = document.getElementById('pdf-preview-content').innerHTML;
+  const win = window.open('', '', 'height=700,width=1000');
+  win.document.write('<html><head><title>Impressão RHC</title>');
+  win.document.write('<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">');
+  win.document.write(`<style>
+      body { font-family: Inter, sans-serif; background: #e2e8f0; margin: 0; padding: 20px; }
+      .a4-landscape-page { width: 297mm; height: 200mm; background: white; margin: 0 auto 20px auto; padding: 15mm; box-sizing: border-box; page-break-after: always; border: 1px solid #cbd5e1; }
+      .pdf-grid-row { display: flex; gap: 15mm; margin-bottom: 10mm; width: 100%; }
+      .pdf-item-full { width: 100%; }
+      .pdf-item-half { width: calc(50% - 7.5mm); }
+      .pdf-export-mode { border: 1px solid #cbd5e1; padding: 15px; border-radius: 8px; box-sizing: border-box; height: 100%; }
+      .pdf-export-mode .chart-title { border-bottom: 2px solid #1e293b; font-weight: 900; padding-bottom: 8px; margin-bottom: 15px; font-size: 13px; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      th, td { border-bottom: 1px solid #f1f5f9; padding: 8px; text-align: left; }
+      th { border-bottom: 2px solid #cbd5e1; }
+      .table-total-row { font-weight: bold; background: #f8fafc; }
+      img { max-width: 100%; max-height: 280px; object-fit: contain; display: block; margin: 0 auto; }
+      @media print { body { background: white; padding: 0; } .a4-landscape-page { margin: 0; border: none; box-shadow: none; padding: 10mm; height: 210mm;} }
+  </style>`);
+  win.document.write('</head><body>');
+  win.document.write(content);
+  win.document.write('</body></html>');
+  win.document.close();
+  setTimeout(() => { win.print(); win.close(); }, 800); 
+}
+
+// =========================================================================
+// 11. MOTOR DE PESQUISA AVANÇADA ANONIMIZADA (V4.1)
+// =========================================================================
+
+const COLUNAS_MINERACAO = [
+  // 1. Período
+  { id: 'anoRef', label: 'Ano RHC', tipo: 'multi', grupo: 'periodo' },
+  { id: 'mesRef', label: 'Mês', tipo: 'multi', grupo: 'periodo' },
+  // 2. Demografia
+  { id: 'sexo', label: 'Sexo', tipo: 'multi', grupo: 'demografico' },
+  { id: 'etnia', label: 'Etnia', tipo: 'multi', grupo: 'demografico' },
+  { id: 'idade', label: 'Idade', tipo: 'number', grupo: 'demografico' },
+  { id: 'cidade', label: 'Cidade Residente', tipo: 'multi', grupo: 'demografico' },
+  // 3. CIDs Isolados (Destaque)
+  { id: 'cid', label: 'CID Diagnóstico', tipo: 'multi', grupo: 'cids' },
+  // 4. Diagnóstico Detalhado
+  { id: 'diagTrat', label: 'Diagnóstico Anterior', tipo: 'multi', grupo: 'diagnostico' },
+  { id: 'baseDiag', label: 'Base do Diagnóstico', tipo: 'multi', grupo: 'diagnostico' },
+  { id: 'locTumor', label: 'Loc. Tumor Primário', tipo: 'multi', grupo: 'diagnostico' },
+  { id: 'tipoHist', label: 'Histologia (CID-O)', tipo: 'multi', grupo: 'diagnostico' },
+  // 5. Clínico
+  { id: 'clinicaTrat', label: 'Clínica de Início', tipo: 'multi', grupo: 'clinico' },
+  { id: 'primTrat', label: '1º Tratamento', tipo: 'multi', grupo: 'clinico' },
+  { id: 'estadoDoenca', label: 'Estado da Doença', tipo: 'multi', grupo: 'clinico' },
+  { id: 'razaoNaoTrat', label: 'Razão Não Trat.', tipo: 'multi', grupo: 'clinico' },
+  // 6. Métricas Adicionais
+  { id: 'convenio', label: 'Convênio', tipo: 'multi', grupo: 'outros' },
+  { id: 'lei60', label: 'Dias (Lei 60)', tipo: 'number', grupo: 'outros' },
+  { id: 'obitoFlag', label: 'Desfecho Clínico', tipo: 'multi', grupo: 'outros' }
+];
+
+const GRUPOS_SIDEBAR = {
+  'periodo': { icon: 'fa-calendar-days', title: 'Período', destaque: false },
+  'demografico': { icon: 'fa-users', title: 'Demografia Principal', destaque: false },
+  'cids': { icon: 'fa-virus', title: 'Agrupamentos de CIDs', destaque: true },
+  'diagnostico': { icon: 'fa-microscope', title: 'Diagnóstico', destaque: false },
+  'clinico': { icon: 'fa-user-doctor', title: 'Acompanhamento Clínico', destaque: false },
+  'outros': { icon: 'fa-scale-balanced', title: 'Métricas e Desfechos', destaque: false }
+};
+
+const MESES_ORDEM = { "JAN":1, "FEV":2, "MAR":3, "ABR":4, "MAI":5, "JUN":6, "JUL":7, "AGO":8, "SET":9, "OUT":10, "NOV":11, "DEZ":12 };
+let basePesquisaGlobal = [];
+
+function abrirPesquisaAvancada() {
+  document.getElementById('loader').style.display = 'flex';
+  document.getElementById('loader-msg').innerText = "Estabelecendo conexão segura com a base global...";
+  document.getElementById('modal-pesquisa-avancada').style.display = 'flex';
+
+  const chaveGlobal = "GLOBAL_" + modeloCalendarioAtual;
+  
+  if (CACHE_ANOS_PROCESSADOS[chaveGlobal] && CACHE_ANOS_PROCESSADOS[chaveGlobal].length > 0) {
+    processarBaseParaMinar(CACHE_ANOS_PROCESSADOS[chaveGlobal]);
+  } else {
+    google.script.run.withSuccessHandler(function(res) {
+       if (res && res.dados) {
+          CACHE_ANOS_PROCESSADOS[chaveGlobal] = res.dados;
+          processarBaseParaMinar(res.dados);
+       } else {
+          alert("Falha ao carregar base.");
+          fecharPesquisaAvancada();
+       }
+    }).buscarHistoricoDash("GLOBAL", modeloCalendarioAtual); 
+  }
+}
+
+function processarBaseParaMinar(dadosBrutos) {
+  basePesquisaGlobal = dadosBrutos.map(d => {
+    let partesData = (d.mesAno || "S/D").split('/');
+    let cidadeLimpa = (d.cidade || "SEM INFO").split(',')[0].split('-')[0].trim().toUpperCase();
+
+    return {
+      anoRef: partesData[1] || "-",
+      mesRef: partesData[0] || "-",
+      idade: d.idade !== null && d.idade !== "" ? d.idade : "-",
+      lei60: d.lei60 !== null && d.lei60 !== "" ? d.lei60 : "-",
+      cid: d.cid || "SEM INFO",
+      diagTrat: d.diagTrat || "SEM INFO",
+      clinicaTrat: d.clinicaTrat || "SEM INFO",
+      primTrat: d.primTrat || "SEM INFO",
+      estadoDoenca: d.estadoDoenca || "SEM INFO",
+      razaoNaoTrat: d.razaoNaoTrat || "SEM INFO",
+      baseDiag: d.baseDiag || "SEM INFO",
+      locTumor: d.locTumor || "SEM INFO",
+      tipoHist: d.tipoHist || "SEM INFO",
+      convenio: d.convenio || "SEM INFO",
+      sexo: d.sexo || "SEM INFO",
+      etnia: d.etnia || "SEM INFO",
+      cidade: cidadeLimpa,
+      obitoFlag: d.obito ? "ÓBITO" : "VIVO"
+    };
+  });
+
+  montarSidebarOrganizada();
+  document.getElementById('loader').style.display = 'none';
+  estadoInicialPesquisa(); 
+}
+
+function estadoInicialPesquisa() {
+  document.querySelectorAll('.custom-multi-select input[type="checkbox"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.custom-multi-select input[type="number"]').forEach(inpt => inpt.value = "");
+  document.querySelectorAll('.custom-multi-select select').forEach(sel => sel.value = "");
+  document.querySelectorAll('.badge-count').forEach(b => b.style.display = 'none');
+  
+  document.getElementById('stat-casos').innerText = "0";
+  document.getElementById('stat-desc-filtros').innerHTML = "Aguardando seleções para compor o relatório.";
+  document.getElementById('dist-anos').innerHTML = "";
+  document.getElementById('dist-meses').innerHTML = "";
+  document.getElementById('lbl-anos').style.display = 'none';
+  document.getElementById('lbl-meses').style.display = 'none';
+  document.getElementById('body-indep').innerHTML = `<tr><td colspan="${COLUNAS_MINERACAO.length}" style="text-align:center; padding:100px; color:#94a3b8; font-size:14px;"><i class="fa-solid fa-hand-pointer" style="font-size:30px; display:block; margin-bottom:10px;"></i> Selecione filtros no menu lateral para iniciar a mineração.</td></tr>`;
+}
+
+function montarSidebarOrganizada() {
+  const container = document.getElementById('container-sidebar-grupos');
+  container.innerHTML = '';
+
+  Object.keys(GRUPOS_SIDEBAR).forEach(key => {
+    const config = GRUPOS_SIDEBAR[key];
+    const classeDestaque = config.destaque ? 'filter-group-destaque' : '';
+    container.innerHTML += `
+      <div class="filter-group-box ${classeDestaque}" id="box-grp-${key}">
+        <span class="filter-group-title"><i class="fa-solid ${config.icon}"></i> ${config.title}</span>
+      </div>`;
+  });
+
+  COLUNAS_MINERACAO.forEach(col => {
+    const boxGrupo = document.getElementById(`box-grp-${col.grupo}`);
+    
+    if (col.tipo === 'number') {
+      boxGrupo.innerHTML += `
+        <div class="custom-multi-select">
+          <label class="filtro-titulo">${col.label}</label>
+          <div class="num-filter-group">
+            <select id="op-${col.id}" onchange="toggleInputEntre('${col.id}'); executarFiltragemAvancada()">
+              <option value="">Ignorar Regra</option>
+              <option value=">">Maior que (>)</option>
+              <option value="<">Menor que (<)</option>
+              <option value=">=">Maior ou igual (>=)</option>
+              <option value="<=">Menor ou igual (<=)</option>
+              <option value="==">Igual (=)</option>
+              <option value="between">Entre X e Y</option>
+              <option value="not_empty">Contém Dados</option>
+              <option value="empty">Vazio / Sem Info</option>
+            </select>
+            <input type="number" id="v1-${col.id}" placeholder="X" onkeyup="executarFiltragemAvancada()">
+            <input type="number" id="v2-${col.id}" placeholder="Y" style="display:none;" onkeyup="executarFiltragemAvancada()">
+          </div>
+        </div>`;
+    } else {
+      let valoresUnicos = [...new Set(basePesquisaGlobal.map(d => String(d[col.id]).trim()))].filter(v => v !== "");
+      
+      if (col.id === 'mesRef') {
+         valoresUnicos.sort((a, b) => (MESES_ORDEM[a] || 99) - (MESES_ORDEM[b] || 99));
+      } else {
+         valoresUnicos.sort();
+      }
+
+      // Adicionada a setinha (chevron) no select-btn
+      let dropdownHTML = `
+        <div class="custom-multi-select" id="ms-${col.id}">
+          <label class="filtro-titulo">${col.label}</label>
+          <div class="select-btn" onclick="toggleDropdownPesquisa('ms-${col.id}')">
+            <div style="display:flex; align-items:center;">
+              <span>Selecionar...</span>
+              <span class="badge-count" id="badge-${col.id}">0</span>
+            </div>
+            <i class="fa-solid fa-chevron-down"></i>
+          </div>
+          <div class="select-dropdown" onclick="event.stopPropagation();">
+            <div class="dropdown-search-box">
+               <input type="text" placeholder="Buscar opção..." onkeyup="filtrarOpcoesDropdown('${col.id}', this.value)">
+            </div>
+            <div class="dropdown-actions">
+               <span onclick="marcarTodosDropdown('${col.id}', true)">+ Todas</span>
+               <span onclick="marcarTodosDropdown('${col.id}', false)">- Nenhuma</span>
+            </div>
+            <div class="dropdown-list-items">
+      `;
+
+      valoresUnicos.forEach(v => {
+         dropdownHTML += `<label class="chk-label"><input type="checkbox" class="chk-item-${col.id}" data-nome="${col.label}" value="${v}" onchange="atualizarBadgeDropdown('${col.id}')"> ${v}</label>`;
+      });
+
+      dropdownHTML += `</div></div></div>`;
+      boxGrupo.innerHTML += dropdownHTML;
+    }
+  });
+
+  const thead = document.getElementById('head-indep');
+  thead.innerHTML = `<tr>${COLUNAS_MINERACAO.map(c => `<th>${c.label}</th>`).join('')}</tr>`;
+}
+
+// ==========================================
+// INTERAÇÕES DE CLIQUE E DROPDOWN
+// ==========================================
+function toggleInputEntre(id) {
+  const op = document.getElementById(`op-${id}`).value;
+  const v1 = document.getElementById(`v1-${id}`);
+  const v2 = document.getElementById(`v2-${id}`);
+  if (op === 'between') { v1.style.display = 'block'; v2.style.display = 'block'; } 
+  else if (op === 'empty' || op === 'not_empty' || op === '') { v1.style.display = 'none'; v2.style.display = 'none'; } 
+  else { v1.style.display = 'block'; v2.style.display = 'none'; }
+}
+
+function toggleDropdownPesquisa(id) {
+  const el = document.getElementById(id);
+  const isOpen = el.classList.contains('open');
+  // Fecha todos primeiro
+  document.querySelectorAll('.custom-multi-select').forEach(e => e.classList.remove('open'));
+  // Abre o que clicou (se já não estava aberto)
+  if (!isOpen) {
+     el.classList.add('open');
+     event.stopPropagation(); // Impede o fechamento imediato pelo clique global
+  }
+}
+
+// Clicar fora fecha os menus
+document.addEventListener('click', function(event) {
+  if (!event.target.closest('.custom-multi-select')) {
+    document.querySelectorAll('.custom-multi-select.open').forEach(el => el.classList.remove('open'));
+  }
+});
+
+function filtrarOpcoesDropdown(colId, termo) {
+  const labels = document.querySelectorAll(`#ms-${colId} .dropdown-list-items .chk-label`);
+  const textoBuscado = termo.toUpperCase().trim();
+  labels.forEach(lbl => {
+    lbl.style.display = lbl.innerText.toUpperCase().includes(textoBuscado) ? "flex" : "none";
+  });
+}
+
+function marcarTodosDropdown(colId, isChecked) {
+  const checkboxes = document.querySelectorAll(`#ms-${colId} .dropdown-list-items .chk-label`);
+  checkboxes.forEach(lbl => {
+    if (lbl.style.display !== "none") lbl.querySelector('input').checked = isChecked;
+  });
+  atualizarBadgeDropdown(colId);
+}
+
+function atualizarBadgeDropdown(colId) {
+  const checados = document.querySelectorAll(`.chk-item-${colId}:checked`).length;
+  const badge = document.getElementById(`badge-${colId}`);
+  if (checados > 0) { badge.style.display = 'inline-block'; badge.innerText = checados; } 
+  else { badge.style.display = 'none'; }
+  executarFiltragemAvancada();
+}
+
+// ==========================================
+// MOTOR LÓGICO DA PESQUISA
+// ==========================================
+function executarFiltragemAvancada() {
+  let descricoesAtivas = []; 
+  let filtrosTextuais = {};
+  let filtrosNumericos = {};
+  let totalFiltrosUsados = 0;
+
+  COLUNAS_MINERACAO.forEach(col => {
+    if (col.tipo === 'number') {
+      const op = document.getElementById(`op-${col.id}`).value;
+      if (op !== "") {
+        filtrosNumericos[col.id] = { op: op, v1: parseFloat(document.getElementById(`v1-${col.id}`).value), v2: parseFloat(document.getElementById(`v2-${col.id}`).value) };
+        descricoesAtivas.push(`<strong>${col.label}:</strong> Regra Matemática Ativa`);
+        totalFiltrosUsados++;
+      }
+    } else {
+      let marcados = Array.from(document.querySelectorAll(`.chk-item-${col.id}:checked`));
+      if (marcados.length > 0) {
+        filtrosTextuais[col.id] = marcados.map(cb => cb.value);
+        let nomes = marcados.map(cb => cb.value).join(', ');
+        if(marcados.length > 3) nomes = `${marcados.length} itens selecionados`;
+        descricoesAtivas.push(`<strong>${col.label}:</strong> ${nomes}`);
+        totalFiltrosUsados++;
+      }
+    }
+  });
+
+  if (totalFiltrosUsados === 0) return estadoInicialPesquisa();
+
+  const resultados = basePesquisaGlobal.filter(paciente => {
+    for (let colId in filtrosNumericos) {
+      const fNum = filtrosNumericos[colId];
+      const valText = paciente[colId];
+      const valNum = parseFloat(valText);
+      const isEmpt = (valText === "-" || valText === "" || isNaN(valNum));
+
+      if (fNum.op === 'empty' && !isEmpt) return false;
+      if (fNum.op === 'not_empty' && isEmpt) return false;
+      if (fNum.op !== 'empty' && fNum.op !== 'not_empty') {
+         if (isEmpt) return false;
+         if (fNum.op === ">" && !(valNum > fNum.v1)) return false;
+         if (fNum.op === "<" && !(valNum < fNum.v1)) return false;
+         if (fNum.op === ">=" && !(valNum >= fNum.v1)) return false;
+         if (fNum.op === "<=" && !(valNum <= fNum.v1)) return false;
+         if (fNum.op === "==" && !(valNum === fNum.v1)) return false;
+         if (fNum.op === "between" && !(valNum >= fNum.v1 && valNum <= fNum.v2)) return false;
+      }
+    }
+
+    for (let colId in filtrosTextuais) {
+      if (!filtrosTextuais[colId].includes(String(paciente[colId]).trim())) return false;
+    }
+    return true; 
+  });
+
+  document.getElementById('stat-casos').innerText = resultados.length;
+  
+  const descContainer = document.getElementById('stat-desc-filtros');
+  descContainer.innerHTML = descricoesAtivas.map(d => `<div style="margin-bottom:4px;">&bull; ${d}</div>`).join('');
+
+  // DISTRIBUIÇÃO NO TEMPO (COM TABELAS TRANSPOSTAS)
+  let contagemAnos = {}, contagemMeses = {};
+  resultados.forEach(r => {
+    contagemAnos[r.anoRef] = (contagemAnos[r.anoRef] || 0) + 1;
+    contagemMeses[r.mesRef] = (contagemMeses[r.mesRef] || 0) + 1;
+  });
+
+  let anosOrdenados = Object.keys(contagemAnos).sort();
+  let mesesOrdenados = Object.keys(contagemMeses).filter(m => m !== '-').sort((a, b) => (MESES_ORDEM[a] || 99) - (MESES_ORDEM[b] || 99));
+
+  // Prepara as Visões Badges
+  document.getElementById('lbl-anos').style.display = 'block';
+  document.getElementById('dist-anos').innerHTML = anosOrdenados.map(a => `<div class="dist-badge">${a} <span>${contagemAnos[a]}</span></div>`).join('');
+
+  if (mesesOrdenados.length > 0 && (mesesOrdenados.length < 12 || filtrosTextuais['mesRef'])) {
+    document.getElementById('lbl-meses').style.display = 'block';
+    document.getElementById('dist-meses').innerHTML = mesesOrdenados.map(m => `<div class="dist-badge">${m} <span>${contagemMeses[m]}</span></div>`).join('');
+  } else {
+    document.getElementById('lbl-meses').style.display = 'none';
+    document.getElementById('dist-meses').innerHTML = '';
+  }
+
+  // Prepara as Tabelas Transpostas
+  const contTabelaAnos = document.getElementById('container-tabela-anos');
+  const contTabelaMeses = document.getElementById('container-tabela-meses');
+  
+  let tableAnosHtml = `<table class="dist-table-transposta"><thead><tr>${anosOrdenados.map(a => `<th>${a}</th>`).join('')}</tr></thead><tbody><tr>${anosOrdenados.map(a => `<td>${contagemAnos[a]}</td>`).join('')}</tr></tbody></table>`;
+  contTabelaAnos.innerHTML = tableAnosHtml;
+
+  if (document.getElementById('lbl-meses').style.display === 'block') {
+    let tableMesesHtml = `<table class="dist-table-transposta"><thead><tr>${mesesOrdenados.map(m => `<th>${m}</th>`).join('')}</tr></thead><tbody><tr>${mesesOrdenados.map(m => `<td>${contagemMeses[m]}</td>`).join('')}</tr></tbody></table>`;
+    contTabelaMeses.innerHTML = tableMesesHtml;
+  } else {
+    contTabelaMeses.innerHTML = '';
+  }
+
+  // RENDERIZA A TABELA PRINCIPAL
+  const tbody = document.getElementById('body-indep');
+  if (resultados.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${COLUNAS_MINERACAO.length}" style="text-align:center; padding:100px; color:#ef4444; font-weight:bold;">Nenhum registro atende aos critérios cruzados.</td></tr>`;
+  } else {
+    let htmlLinhas = '';
+    resultados.forEach(d => {
+      htmlLinhas += '<tr>';
+      COLUNAS_MINERACAO.forEach(col => { htmlLinhas += `<td>${d[col.id]}</td>`; });
+      htmlLinhas += '</tr>';
+    });
+    tbody.innerHTML = htmlLinhas;
+  }
+}
+
+// Alterna entre ver os botões ou ver as Tabelas
+function toggleDistView() {
+  const vBadge = document.getElementById('view-dist-badges');
+  const vTable = document.getElementById('view-dist-table');
+  if (vBadge.style.display !== 'none') {
+    vBadge.style.display = 'none'; vTable.style.display = 'flex';
+  } else {
+    vBadge.style.display = 'block'; vTable.style.display = 'none';
+  }
+}
+
+function fecharPesquisaAvancada() { document.getElementById('modal-pesquisa-avancada').style.display = 'none'; }
+
+function exportarPesquisaCSV() {
+  const rows = document.querySelectorAll("#tabela-avancada-indep tr");
+  if (rows.length <= 1 || rows[1].innerText.includes("Selecione") || rows[1].innerText.includes("Nenhum")) return alert("Faça uma pesquisa válida primeiro.");
+  let csv = [];
+  for (let i = 0; i < rows.length; i++) {
+    let row = [], cols = rows[i].querySelectorAll("td, th");
+    for (let j = 0; j < cols.length; j++) row.push('"' + cols[j].innerText.replace(/"/g, '""') + '"');
+    csv.push(row.join(";")); 
+  }
+  const csvFile = new Blob(["\ufeff" + csv.join("\n")], {type: "text/csv;charset=utf-8;"});
+  const link = document.createElement("a");
+  link.download = `Mining_Anonimizado_${new Date().getTime()}.csv`;
+  link.href = window.URL.createObjectURL(csvFile);
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
+}
+
+// =========================================================
+// O EXPORTADOR PDF COM LGPD INTEGRADA
+// =========================================================
+function exportarDistribuicaoPDF() {
+  document.getElementById('loader').style.display = 'flex';
+  document.getElementById('loader-msg').innerText = "Gerando relatório em conformidade com a LGPD...";
+
+  const master = document.getElementById('pdf-mineracao-container');
+  const dataFormatada = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR');
+  const filtrosHTML = document.getElementById('stat-desc-filtros').innerHTML;
+  
+  // Assegura que o HTML a ser exportado será sempre a Tabela Transposta
+  const tabelasHTML = document.getElementById('view-dist-table').innerHTML;
+  const totalPacientes = document.getElementById('stat-casos').innerText;
+
+  let cabecalhoOficial = `
+    <div style="border-bottom: 3px solid #1e293b; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+      <div>
+        <h1 style="margin: 0 0 5px 0; font-size: 20px; color: #1e293b; text-transform: uppercase; font-weight: 900;">Hospital de Clínicas de Porto Alegre</h1>
+        <h2 style="margin: 0; font-size: 14px; color: #475569; font-weight: 600;">Relatório de Mineração de Dados RHC (Anonimizado)</h2>
+      </div>
+      <div style="text-align: right; font-size: 11px; color: #64748b;">
+        <div><strong>Data do Relatório:</strong> ${dataFormatada}</div>
+        <div><strong>Amostra Encontrada:</strong> ${totalPacientes} casos</div>
+      </div>
+    </div>
+    
+    <h3 style="font-size: 14px; margin-bottom: 10px;">Filtros e Critérios Aplicados:</h3>
+    <div style="background: #f1f5f9; padding: 15px; border-radius: 6px; font-size: 11px; margin-bottom: 30px;">
+      ${filtrosHTML}
+    </div>
+
+    <h3 style="font-size: 14px; margin-bottom: 10px;">Distribuição Temporal da Amostra:</h3>
+    <div style="margin-bottom: 40px;">
+      <style>
+         .tabela-pdf-export { width: 100%; border-collapse: collapse; font-size: 11px; text-align: center; margin-bottom: 15px; }
+         .tabela-pdf-export th { background: #e2e8f0; border: 1px solid #cbd5e1; padding: 8px; font-weight: 800;}
+         .tabela-pdf-export td { border: 1px solid #cbd5e1; padding: 8px; font-weight: 600; color: #1e293b; }
+      </style>
+      ${tabelasHTML.replace(/dist-table-transposta/g, 'tabela-pdf-export')}
+    </div>
+    
+    <div style="margin-top: 50px; padding-top: 15px; border-top: 1px dashed #cbd5e1; font-size: 9px; color: #64748b; text-align: justify; line-height: 1.4;">
+      <strong>TERMO DE CONFORMIDADE COM A LGPD (Lei nº 13.709/2018):</strong><br>
+      Este relatório foi gerado automaticamente pelo Motor de Inteligência RHC e contém exclusivamente dados agregados e anonimizados. A reidentificação de pacientes a partir destas informações quantitativas é estritamente proibida. O conteúdo destina-se a fins de gestão clínica e estatística hospitalar interna, não devendo ser compartilhado em canais não autorizados pela instituição.
+    </div>
+  `;
+
+  master.innerHTML = cabecalhoOficial;
+  master.style.visibility = 'visible';
+  master.style.display = 'block';
+
+  const opt = {
+    margin: [20, 15, 20, 15],
+    filename: `RHC_Extrato_Pesquisa_${new Date().getTime()}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(master).save().then(() => {
+    document.getElementById('loader').style.display = 'none';
+    master.innerHTML = '';
+    master.style.visibility = 'hidden';
+    master.style.display = 'none';
+  });
+}
+
+  </script>
+</body>
+</html>
